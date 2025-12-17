@@ -156,12 +156,11 @@ st.markdown("""
 
 @st.cache_data(ttl=3600)  # Cache for 1 hour
 def load_data():
-    """Load and cache school data."""
+    """Load and cache school data from Google Sheets."""
     try:
-        data_dir = project_root / 'data' / 'raw'
-        return load_school_data(data_dir)
-    except FileNotFoundError as e:
-        st.error(f"Data file not found: {e}")
+        return load_school_data()
+    except Exception as e:
+        st.error(f"Failed to load data: {e}")
         st.stop()
 
 
