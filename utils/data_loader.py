@@ -550,23 +550,18 @@ def calculate_summary_stats(df: pd.DataFrame, full_df: Optional[pd.DataFrame] = 
         'mappable_schools': mappable,
         'complete': len(df[df['training_status'] == 'Complete']),
         'partial': len(df[df['training_status'].isin(['Fundamentals Only', 'LIGHTS Only'])]),
-        # no_training uses universe_df so it always shows schools needing outreach
-        'no_training': len(universe_df[universe_df['training_status'] == 'No Training']),
+        'no_training': len(df[df['training_status'] == 'No Training']),
         'total_participants': df['total_participants'].sum() if 'total_participants' in df.columns else 0,
     }
 
-    # Calculate percentages (based on filtered view)
+    # Calculate percentages - all based on filtered total for consistency
+    # This ensures: Total = Complete + Partial + No Training, and percentages sum to 100%
     if total > 0:
         stats['complete_pct'] = round(stats['complete'] / total * 100, 1)
         stats['partial_pct'] = round(stats['partial'] / total * 100, 1)
+        stats['no_training_pct'] = round(stats['no_training'] / total * 100, 1)
     else:
-        stats['complete_pct'] = stats['partial_pct'] = 0
-
-    # no_training percentage uses universe total for proper context
-    if universe_total > 0:
-        stats['no_training_pct'] = round(stats['no_training'] / universe_total * 100, 1)
-    else:
-        stats['no_training_pct'] = 0
+        stats['complete_pct'] = stats['partial_pct'] = stats['no_training_pct'] = 0
 
     # STH statistics (separate indicator) - from filtered view
     if 'sth_percent' in df.columns:
