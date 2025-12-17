@@ -586,10 +586,12 @@ def calculate_summary_stats(df: pd.DataFrame, full_df: Optional[pd.DataFrame] = 
         if 'high_eni' in df.columns:
             stats['high_eni_count'] = df['high_eni'].sum()
 
-    # Priority schools: high STH + no training - uses universe_df for strategic awareness
+    # Priority schools: high ENI + no training - uses universe_df for strategic awareness
+    # ENI (Economic Need Index) is a composite vulnerability indicator that captures
+    # multiple factors including STH, making it better for prioritization than STH alone
     # (always shows actionable outreach targets regardless of training status filter)
-    if 'high_sth' in universe_df.columns and 'training_status' in universe_df.columns:
-        priority_mask = (universe_df['high_sth'] == True) & (universe_df['training_status'] == 'No Training')
+    if 'high_eni' in universe_df.columns and 'training_status' in universe_df.columns:
+        priority_mask = (universe_df['high_eni'] == True) & (universe_df['training_status'] == 'No Training')
         stats['priority_schools'] = priority_mask.sum()
 
     return stats
