@@ -111,38 +111,42 @@ def load_from_google_sheets(
             "Run: pip install gspread google-auth"
         )
 
-    try:
-        # Define required scopes
-        scopes = [
-            'https://www.googleapis.com/auth/spreadsheets.readonly',
-            'https://www.googleapis.com/auth/drive.readonly'
-        ]
+    # Define required scopes
+    scopes = [
+        'https://www.googleapis.com/auth/spreadsheets.readonly',
+        'https://www.googleapis.com/auth/drive.readonly'
+    ]
 
-        # Try Streamlit Cloud secrets first
-        try:
-            import streamlit as st
-            if "gcp_service_account" in st.secrets:
-                # Running on Streamlit Cloud - use secrets
-                credentials = Credentials.from_service_account_info(
-                    st.secrets["gcp_service_account"],
-                    scopes=scopes
-                )
-                logger.info("Using Streamlit Cloud secrets for authentication")
-            else:
-                raise KeyError("No gcp_service_account in secrets")
-        except (ImportError, KeyError, FileNotFoundError):
-            # Fall back to local file credentials
-            credentials_path = get_credentials_path()
-            if not credentials_path:
-                raise FileNotFoundError(
-                    "Service account credentials not found. "
-                    "Expected at: .credentials/service-account.json or in Streamlit secrets"
-                )
-            credentials = Credentials.from_service_account_file(
-                str(credentials_path),
-                scopes=scopes
+    # Get credentials - Streamlit Cloud uses secrets, local uses file
+    import streamlit as st
+
+    if hasattr(st, 'secrets') and len(st.secrets) > 0:
+        # Running on Streamlit Cloud - MUST use secrets
+        if "gcp_service_account" not in st.secrets:
+            raise RuntimeError(
+                "Streamlit Cloud deployment requires gcp_service_account in secrets. "
+                "Go to App Settings > Secrets and add your service account credentials."
             )
-            logger.info("Using local file credentials for authentication")
+        credentials = Credentials.from_service_account_info(
+            dict(st.secrets["gcp_service_account"]),
+            scopes=scopes
+        )
+        logger.info("Using Streamlit Cloud secrets for authentication")
+    else:
+        # Local development - use file credentials
+        credentials_path = get_credentials_path()
+        if not credentials_path:
+            raise FileNotFoundError(
+                "Service account credentials not found. "
+                "Expected at: .credentials/service-account.json"
+            )
+        credentials = Credentials.from_service_account_file(
+            str(credentials_path),
+            scopes=scopes
+        )
+        logger.info("Using local file credentials for authentication")
+
+    try:
 
         # Connect to Google Sheets
         client = gspread.authorize(credentials)
