@@ -173,18 +173,6 @@ def main():
     # No header - title shows in browser tab, tabs provide context
     # This maximizes map space (Google Maps approach)
 
-    # Sidebar: Data refresh button at top
-    with st.sidebar:
-        st.markdown("#### 🔄 Data Controls")
-        col1, col2 = st.columns([2, 1])
-        with col1:
-            if st.button("🔄 Refresh Data", use_container_width=True, help="Clear cache and reload from Google Sheets"):
-                st.cache_data.clear()
-                st.rerun()
-        with col2:
-            st.caption("1hr cache")
-        st.divider()
-
     # Load data
     with st.spinner("Loading school data..."):
         df = load_data()
@@ -194,6 +182,17 @@ def main():
 
     # Render sidebar filters
     filters = render_sidebar_filters(filter_options)
+
+    # Subtle data refresh at bottom of sidebar
+    with st.sidebar:
+        st.caption("─" * 20)
+        col1, col2 = st.columns([1, 1])
+        with col1:
+            st.caption("Data cached 1hr")
+        with col2:
+            if st.button("↻ Refresh", key="refresh_data", help="Clear cache and reload from Google Sheets"):
+                st.cache_data.clear()
+                st.rerun()
 
     # Apply geographic filters (indicators are now visual-only, not filters)
     geo_filtered_df = filter_schools(
