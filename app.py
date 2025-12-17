@@ -90,13 +90,35 @@ st.markdown("""
         padding: 0.25rem 0 !important;
     }
 
-    /* Tighter tab spacing */
-    .stTabs [data-baseweb="tab-list"] {
-        gap: 1rem;
+    /* Style horizontal radio as tabs */
+    div[data-testid="stHorizontalBlock"]:has(div[data-testid="stRadio"]) {
+        border-bottom: 1px solid #e0e0e0;
+        padding-bottom: 0.5rem;
+        margin-bottom: 0.5rem;
     }
-    .stTabs [data-baseweb="tab"] {
+    div[data-testid="stRadio"] > div {
+        gap: 0 !important;
+    }
+    div[data-testid="stRadio"] label {
+        background: transparent;
+        border: none;
+        border-bottom: 2px solid transparent;
+        padding: 0.5rem 1rem !important;
+        margin: 0 !important;
         font-size: 0.85rem;
-        padding: 0.5rem 1rem;
+        cursor: pointer;
+        transition: all 0.2s;
+    }
+    div[data-testid="stRadio"] label:hover {
+        background: #f0f2f6;
+    }
+    div[data-testid="stRadio"] label[data-checked="true"] {
+        border-bottom: 2px solid #ff4b4b;
+        font-weight: 600;
+    }
+    /* Hide radio circles */
+    div[data-testid="stRadio"] input[type="radio"] {
+        display: none;
     }
 
     /* Minimal dividers */
@@ -158,12 +180,25 @@ st.markdown("""
 def load_data():
     """Load and cache school data from Google Sheets.
 
-    Cache version: 6 - Fixed credentials detection for local development
+    Cache version: 7 - Added vulnerability data fallback debugging
     """
     try:
-        return load_school_data()
+        df = load_school_data()
+        # Debug: Show vulnerability columns status
+        vuln_cols = ['sth_percent', 'economic_need_index', 'high_sth', 'high_eni']
+        loaded_cols = [c for c in vuln_cols if c in df.columns]
+        print(f"[CACHE] Data loaded. Vulnerability columns present: {loaded_cols}")
+        if 'sth_percent' in df.columns:
+            sth_count = df['sth_percent'].notna().sum()
+            print(f"[CACHE] sth_percent has {sth_count} non-null values")
+        if 'economic_need_index' in df.columns:
+            eni_count = df['economic_need_index'].notna().sum()
+            print(f"[CACHE] economic_need_index has {eni_count} non-null values")
+        return df
     except Exception as e:
         st.error(f"Failed to load data: {e}")
+        import traceback
+        st.error(traceback.format_exc())
         st.stop()
 
 
@@ -202,7 +237,7 @@ def main():
         superintendent=filters.get('superintendent'),
         school_type=filters.get('school_type'),
         search_query=filters.get('search_query'),
-        high_sth_only=filters.get('high_sth_only', False),  # Priority quick filter still filters
+        high_eni_only=filters.get('high_eni_only', False),  # Priority quick filter (ENI ≥85%)
     )
 
     # Get indicator highlight thresholds (visual only - affects map markers)
@@ -211,16 +246,17 @@ def main():
         'eni_threshold': filters.get('highlight_eni'),
     }
 
-    # Apply global training status filter (affects ALL views: Map, Stats, Indicators, Data Table)
-    global_training_status = filters.get('global_training_status', 'Training Coverage')
-    filtered_df = filter_by_training_status(geo_filtered_df, global_training_status)
+    # Apply global training status mode (affects ALL views: Map, Stats, Indicators, Data Table)
+    # This is now a "mode" selector, not just a filter - each mode has tailored stats
+    mode = filters.get('global_training_status', '📊 Overview')
+    filtered_df = filter_by_training_status(geo_filtered_df, mode)
 
     # Get map display settings (visual only - don't affect data filtering)
     layer_config = filters.get('layer_config', {})
 
     # Calculate stats - pass both filtered and geo-only filtered for universe metrics
-    # (priority_schools and no_training should always show the big picture)
-    stats = calculate_summary_stats(filtered_df, full_df=geo_filtered_df)
+    # (priority_schools and remaining should always show the big picture)
+    stats = calculate_summary_stats(filtered_df, full_df=geo_filtered_df, mode=mode)
 
     # Show filter summary if filters are active
     render_filter_summary(filters, len(df), len(filtered_df))
@@ -234,18 +270,32 @@ def main():
         unsafe_allow_html=True
     )
 
-    # Main content tabs
-    tab_map, tab_stats, tab_indicators, tab_export, tab_data = st.tabs([
-        "🗺️ Map",
-        "📊 Statistics",
-        "📈 Indicators",
-        "📥 Export",
-        "📋 Data Table"
-    ])
+    # Tab navigation with session state persistence
+    # Using st.radio instead of st.tabs to maintain selection across filter changes
+    TAB_OPTIONS = ["🗺️ Map", "📊 Statistics", "📈 Indicators", "📥 Export", "📋 Data Table"]
 
-    with tab_map:
+    # Initialize session state for active tab
+    if 'active_tab' not in st.session_state:
+        st.session_state.active_tab = TAB_OPTIONS[0]
+
+    # Render tab selector (horizontal radio styled as tabs)
+    active_tab = st.radio(
+        "Navigation",
+        options=TAB_OPTIONS,
+        index=TAB_OPTIONS.index(st.session_state.active_tab),
+        horizontal=True,
+        label_visibility="collapsed",
+        key="tab_selector"
+    )
+
+    # Update session state when tab changes
+    st.session_state.active_tab = active_tab
+
+    # Render content based on active tab (conditional rendering for persistence)
+    if active_tab == "🗺️ Map":
         # Compact stats at top (no divider - flows directly into map)
-        render_stats_panel(stats, filtered_df)
+        # Mode determines which tailored stats panel to show
+        render_stats_panel(stats, filtered_df, mode=mode)
 
         # Get layer config from filters
         layer_config = filters.get('layer_config', {})
@@ -292,7 +342,7 @@ def main():
                 f"{stats['mappable_schools']:,} schools mapped • {enabled_count} layer(s) active • Click for details"
             )
 
-    with tab_stats:
+    elif active_tab == "📊 Statistics":
         col1, col2 = st.columns(2)
 
         with col1:
@@ -309,7 +359,7 @@ def main():
         st.subheader("Key Metrics")
         render_stats_panel(stats, filtered_df)
 
-    with tab_indicators:
+    elif active_tab == "📈 Indicators":
         st.subheader("School-Level Indicators")
         st.caption("Each indicator is shown separately for independent analysis")
 
@@ -370,17 +420,17 @@ def main():
         # Uses geo_filtered_df (not training-filtered) so priority schools always visible
         with st.container(border=True):
             st.markdown("#### ⚠️ Priority Schools for Outreach")
-            st.caption("Schools with **HIGH STH (≥30%)** and **NO training** — highest priority for HTYPE deployment")
+            st.caption("Schools with **HIGH ENI (≥85%)** and **NO training** — highest priority for HTYPE deployment")
             render_priority_schools_table(geo_filtered_df)
 
-    with tab_export:
+    elif active_tab == "📥 Export":
         render_quick_exports(df)  # Use full df for quick exports
 
         st.divider()
 
         render_export_panel(filtered_df)
 
-    with tab_data:
+    elif active_tab == "📋 Data Table":
         st.subheader("School Data Table")
 
         # Column selector

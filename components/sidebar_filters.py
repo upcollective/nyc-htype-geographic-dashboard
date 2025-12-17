@@ -5,6 +5,13 @@ Designed to scale as more indicator variables are added.
 
 Multi-layer training system: Each training type (Fundamentals, LIGHTS, Student Sessions)
 can be toggled independently with depth filtering.
+
+SIDEBAR STRUCTURE (Redesigned Dec 2025):
+1. Analysis Mode (TOP - always visible, not in expander)
+2. Search + Quick Filters
+3. Geography (expander)
+4. Indicator Highlights (expander)
+5. Map Layers (expander - ONLY shown on Map tab)
 """
 import streamlit as st
 from typing import Optional, Dict
@@ -13,44 +20,48 @@ from typing import Optional, Dict
 from utils.color_schemes import TRAINING_LAYER_COLORS, get_layer_hex_color
 
 
-def render_training_status_filter() -> str:
+def render_analysis_mode() -> str:
     """
-    Render task-oriented view mode filter (affects ALL views).
+    Render the Analysis Mode selector (always visible at top of sidebar).
 
-    This is the primary filter for "what am I trying to analyze?"
-    Options are framed around user tasks, not just data attributes.
+    This is the PRIMARY control - it determines what you're analyzing.
+    Each mode provides a tailored stats panel for that workflow.
+
+    Modes:
+    - 📊 Overview: Full picture (all 1,656 schools)
+    - ✅ Trained Schools: Progress view (schools with any training)
+    - 🎯 Need Fundamentals: Outreach targets (no training at all)
+    - 🎯 Need LIGHTS: Next step ready (have Fundamentals, need LIGHTS)
 
     Returns:
-        Selected view mode string
+        Selected mode string
     """
-    status = st.radio(
-        "View Mode",
+    st.sidebar.markdown("### 📊 Analysis Mode")
+
+    mode = st.sidebar.radio(
+        "Analysis Mode",
         options=[
-            "Training Coverage",        # Default: where we've trained
-            "Outreach Targets",         # Where we need to train
-            "Fundamentals Only",        # Schools with only Fundamentals
-            "LIGHTS Only",              # Schools with only LIGHTS
-            "Complete Training",        # Schools with both
-            "All Schools (Reference)",  # Full universe, uniform display
+            "📊 Overview",           # Default: full picture, all schools
+            "✅ Trained Schools",    # Progress: schools with any training
+            "🎯 Need Fundamentals",  # Outreach: no training at all
+            "🎯 Need LIGHTS",        # Next step: have Fundamentals, need LIGHTS
         ],
         index=0,
         key="global_training_status",
-        help="Select what you want to analyze. Affects all views.",
+        help="Select your analysis mode. Each mode shows tailored metrics.",
         label_visibility="collapsed"
     )
 
     # Show description of current selection
     descriptions = {
-        "Training Coverage": "🎯 Schools with training (color = type, size = depth)",
-        "Outreach Targets": "📍 Schools needing training (uniform gray dots)",
-        "Fundamentals Only": "🔵 Schools with Fundamentals training",
-        "LIGHTS Only": "🟣 Schools with LIGHTS ToT training",
-        "Complete Training": "✅ Schools with BOTH Fundamentals AND LIGHTS",
-        "All Schools (Reference)": "📋 Full school universe (uniform display, reference only)"
+        "📊 Overview": "Full picture: all schools with training breakdown",
+        "✅ Trained Schools": "Progress: schools with Fundamentals and/or LIGHTS",
+        "🎯 Need Fundamentals": "Outreach targets: schools with no training",
+        "🎯 Need LIGHTS": "Next step: schools ready for LIGHTS ToT"
     }
-    st.caption(descriptions.get(status, ''))
+    st.sidebar.caption(descriptions.get(mode, ''))
 
-    return status
+    return mode
 
 
 def render_indicator_highlight(
@@ -83,7 +94,12 @@ def render_indicator_highlight(
     col1, col2 = st.columns([1, 3])
 
     with col1:
-        enabled = st.checkbox("", key=f"{key_prefix}_enabled", label_visibility="collapsed")
+        # Provide actual label for accessibility (hidden visually)
+        enabled = st.checkbox(
+            f"Enable {label} highlight",
+            key=f"{key_prefix}_enabled",
+            label_visibility="collapsed"
+        )
 
     with col2:
         if enabled:
@@ -109,34 +125,29 @@ def render_training_layer_controls(training_status: str = 'All Schools') -> Dict
     Render map layer visibility toggles with optional depth filters (visual only).
 
     These controls ONLY affect which colored dots appear on the map.
-    They do NOT filter the underlying data - use the global Training Status
-    filter for that.
+    They do NOT filter the underlying data - use the Analysis Mode for that.
 
     Layer availability auto-adjusts based on training_status:
-    - "No Training": Layers disabled (no trained schools to show)
-    - "Has Fundamentals": Fundamentals relevant, LIGHTS may be subset
-    - "Has LIGHTS": LIGHTS relevant, Fundamentals may be subset
+    - "Need Fundamentals": Layers disabled (no trained schools to show)
+    - "Need LIGHTS": Only Fundamentals layer shown (schools have Fundamentals)
     - Others: All layers available
 
     Args:
-        training_status: Current global training status filter value
+        training_status: Current analysis mode value
 
     Returns:
         Dict with layer visibility and depth configuration
     """
     layers = {}
 
-    # Determine which layers are relevant based on training status
-    # "Outreach Targets" and "All Schools (Reference)" show uniform dots, no training layers
-    layers_disabled = training_status in ['Outreach Targets', 'All Schools (Reference)']
-    fund_default = training_status not in ['LIGHTS Only']  # Default on unless only LIGHTS selected
-    lights_default = training_status not in ['Fundamentals Only']  # Default on unless only Fund selected
+    # Determine which layers are relevant based on analysis mode
+    # "Need Fundamentals" shows untrained schools (no training layers needed)
+    layers_disabled = training_status == '🎯 Need Fundamentals'
+    fund_default = True  # Fundamentals layer on by default for most modes
+    lights_default = training_status not in ['🎯 Need LIGHTS']  # LIGHTS layer off for Need LIGHTS mode
 
     if layers_disabled:
-        if training_status == 'Outreach Targets':
-            st.caption("ℹ️ Showing untrained schools (uniform gray)")
-        else:
-            st.caption("ℹ️ Reference view (uniform display, no training encoding)")
+        st.caption("ℹ️ Showing untrained schools (uniform gray)")
         layers['fundamentals'] = {'enabled': False, 'min_depth': 0}
         layers['lights'] = {'enabled': False, 'min_depth': 0}
         layers['student_sessions'] = {'enabled': False, 'placeholder': True}
@@ -146,7 +157,7 @@ def render_training_layer_controls(training_status: str = 'All Schools') -> Dict
     col_toggle, col_label = st.columns([1, 5])
     with col_toggle:
         fund_enabled = st.checkbox(
-            "fund_layer",
+            "Fundamentals layer",
             value=fund_default,
             key="layer_fundamentals",
             label_visibility="collapsed"
@@ -174,7 +185,7 @@ def render_training_layer_controls(training_status: str = 'All Schools') -> Dict
     col_toggle, col_label = st.columns([1, 5])
     with col_toggle:
         lights_enabled = st.checkbox(
-            "lights_layer",
+            "LIGHTS layer",
             value=lights_default,
             key="layer_lights",
             label_visibility="collapsed"
@@ -202,7 +213,7 @@ def render_training_layer_controls(training_status: str = 'All Schools') -> Dict
     col_toggle, col_label = st.columns([1, 5])
     with col_toggle:
         st.checkbox(
-            "students_layer",
+            "Student Sessions layer",
             value=False,
             key="layer_students",
             disabled=True,
@@ -221,6 +232,13 @@ def render_sidebar_filters(filter_options: dict) -> dict:
     """
     Render sidebar filter controls and return selected filter values.
 
+    SIDEBAR STRUCTURE:
+    1. Analysis Mode (TOP - always visible)
+    2. Search + Quick Filters
+    3. Geography (expander)
+    4. Indicator Highlights (expander)
+    5. Map Layers (expander - ONLY on Map tab)
+
     Args:
         filter_options: Dictionary of available filter options from get_filter_options()
 
@@ -235,8 +253,8 @@ def render_sidebar_filters(filter_options: dict) -> dict:
         st.session_state['filter_districts'] = []
         st.session_state['filter_superintendent'] = 'All'
         st.session_state['filter_school_type'] = 'All'
-        # Global training status filter - default to Training Coverage
-        st.session_state['global_training_status'] = 'Training Coverage'
+        # Analysis mode - default to Overview
+        st.session_state['global_training_status'] = '📊 Overview'
         # Map display controls (visual only - don't filter data)
         st.session_state['layer_fundamentals'] = True
         st.session_state['layer_lights'] = True
@@ -250,9 +268,12 @@ def render_sidebar_filters(filter_options: dict) -> dict:
         st.session_state['quick_filter'] = None
         st.session_state['_clear_filters_requested'] = False
 
-    st.sidebar.header("🔍 Filters")
+    # ════════════════════════════════════════════════════════════════════════════
+    # 1. SEARCH + QUICK FILTERS
+    # ════════════════════════════════════════════════════════════════════════════
+    st.sidebar.markdown("### 🔍 Search & Filter")
 
-    # Search box (always visible)
+    # Search box
     search_query = st.sidebar.text_input(
         "Search Schools",
         placeholder="Enter school name or DBN...",
@@ -260,9 +281,8 @@ def render_sidebar_filters(filter_options: dict) -> dict:
         key="filter_search"
     )
 
-    # Quick Filter Buttons (always visible)
-    st.sidebar.markdown("##### Quick Filters")
-
+    # Quick Filter Buttons
+    st.sidebar.caption("Quick Filters")
     col1, col2, col3 = st.sidebar.columns(3)
 
     with col1:
@@ -272,19 +292,15 @@ def render_sidebar_filters(filter_options: dict) -> dict:
     with col3:
         clear_filters = st.button("Clear All", use_container_width=True, key="qf_clear")
 
+    # ════════════════════════════════════════════════════════════════════════════
+    # 2. ANALYSIS MODE (after quick filters, outside expander)
+    # ════════════════════════════════════════════════════════════════════════════
     st.sidebar.divider()
+    analysis_mode = render_analysis_mode()
 
-    # === GLOBAL TRAINING STATUS FILTER (NEW - affects ALL views) ===
-    with st.sidebar.expander("📚 Training Status", expanded=True):
-        st.caption("Filter by training completion (affects all views)")
-        global_training_status = render_training_status_filter()
-
-    # === MAP LAYERS SECTION (visual only - affects map tab only) ===
-    with st.sidebar.expander("🗺️ Map Layers", expanded=False):
-        st.caption("Toggle training types to show on map (visual only)")
-        layer_config = render_training_layer_controls(global_training_status)
-
-    # === GEOGRAPHY SECTION ===
+    # ════════════════════════════════════════════════════════════════════════════
+    # 3. GEOGRAPHY (expander)
+    # ════════════════════════════════════════════════════════════════════════════
     with st.sidebar.expander("📍 Geography", expanded=False):
         selected_boroughs = st.multiselect(
             "Boroughs",
@@ -328,11 +344,13 @@ def render_sidebar_filters(filter_options: dict) -> dict:
             if selected_school_type == 'All':
                 selected_school_type = None
 
-    # === INDICATORS SECTION (Visual Highlights - Map Only) ===
-    with st.sidebar.expander("📊 Indicators", expanded=False):
+    # ════════════════════════════════════════════════════════════════════════════
+    # 4. INDICATOR HIGHLIGHTS (expander)
+    # ════════════════════════════════════════════════════════════════════════════
+    with st.sidebar.expander("📊 Indicator Highlights", expanded=False):
         st.caption("Highlight high-need schools on map (visual only)")
 
-        # STH Indicator - now a visual highlight, not a filter
+        # STH Indicator - visual highlight
         st.markdown("**🏠 Students in Temp Housing (STH)**")
         highlight_sth = render_indicator_highlight(
             label="STH",
@@ -346,7 +364,7 @@ def render_sidebar_filters(filter_options: dict) -> dict:
 
         st.markdown("---")
 
-        # ENI Indicator - now a visual highlight, not a filter
+        # ENI Indicator - visual highlight
         st.markdown("**💰 Economic Need Index (ENI)**")
         highlight_eni = render_indicator_highlight(
             label="ENI",
@@ -358,15 +376,44 @@ def render_sidebar_filters(filter_options: dict) -> dict:
             help_text="Highlight schools with high economic need"
         )
 
-        # Placeholder for future indicators
         st.markdown("---")
         st.caption("*More indicators coming soon*")
+
+    # ════════════════════════════════════════════════════════════════════════════
+    # 5. MAP LAYERS (expander - ONLY shown on Map tab)
+    # ════════════════════════════════════════════════════════════════════════════
+    # Check if we're on the Map tab
+    # IMPORTANT: Use 'tab_selector' (widget key) not 'active_tab' (derived value)
+    # Widget keys are updated by Streamlit BEFORE script runs, so they're current
+    # 'active_tab' is set AFTER sidebar renders, so it would be stale here
+    active_tab = st.session_state.get('tab_selector', '🗺️ Map')
+    is_map_tab = active_tab == '🗺️ Map'
+
+    # Only render Map Layers controls when on Map tab
+    if is_map_tab:
+        with st.sidebar.expander("🗺️ Map Layers", expanded=False):
+            st.caption("Toggle training types to show on map")
+            layer_config = render_training_layer_controls(analysis_mode)
+    else:
+        # Provide default layer config when not on map tab
+        # (preserves any existing session state values)
+        layer_config = {
+            'fundamentals': {
+                'enabled': st.session_state.get('layer_fundamentals', True),
+                'min_depth': st.session_state.get('fund_min_depth', 0)
+            },
+            'lights': {
+                'enabled': st.session_state.get('layer_lights', True),
+                'min_depth': st.session_state.get('lights_min_depth', 0)
+            },
+            'student_sessions': {'enabled': False, 'placeholder': True}
+        }
 
     # Build filters dictionary
     filters = {
         'search_query': search_query if search_query else None,
-        # Global training status filter (affects ALL views)
-        'global_training_status': global_training_status,
+        # Analysis mode (affects ALL views)
+        'global_training_status': analysis_mode,
         # Map layer settings (visual only - affects map tab only)
         'layer_config': layer_config,
         # Geographic filters
@@ -377,7 +424,7 @@ def render_sidebar_filters(filter_options: dict) -> dict:
         # Indicator highlights (visual only - affects map markers)
         'highlight_sth': highlight_sth,
         'highlight_eni': highlight_eni,
-        'high_sth_only': False,  # Set by Priority quick filter (this still filters data)
+        'high_eni_only': False,  # Set by Priority quick filter (ENI ≥85% + no training)
     }
 
     # Handle quick filter buttons using session state
@@ -394,13 +441,14 @@ def render_sidebar_filters(filter_options: dict) -> dict:
         st.session_state['_clear_filters_requested'] = True
         st.rerun()  # Trigger rerun to apply the clear
 
-    # Apply quick filter - override global_training_status when quick filter is active
+    # Apply quick filter - override analysis_mode when quick filter is active
     if st.session_state.quick_filter == 'no_training':
-        filters['global_training_status'] = 'Outreach Targets'
+        filters['global_training_status'] = '🎯 Need Fundamentals'
     elif st.session_state.quick_filter == 'priority':
-        # Priority schools: high STH + no training
-        filters['global_training_status'] = 'Outreach Targets'
-        filters['high_sth_only'] = True
+        # Priority schools: high ENI (≥85%) + no training
+        # ENI is a composite vulnerability indicator that includes STH
+        filters['global_training_status'] = '🎯 Need Fundamentals'
+        filters['high_eni_only'] = True
 
     return filters
 
@@ -418,7 +466,7 @@ def render_filter_summary(filters: dict, total_count: int, filtered_count: int):
         if len(filters['districts']) > 3:
             districts_str += f" +{len(filters['districts']) - 3}"
         active_filters.append(f"D{districts_str}")
-    if filters.get('global_training_status') and filters['global_training_status'] != 'Training Coverage':
+    if filters.get('global_training_status') and filters['global_training_status'] != '📊 Overview':
         active_filters.append(filters['global_training_status'])
     if filters.get('superintendent'):
         active_filters.append(filters['superintendent'][:15] + "..." if len(filters['superintendent']) > 15 else filters['superintendent'])
@@ -426,8 +474,8 @@ def render_filter_summary(filters: dict, total_count: int, filtered_count: int):
         active_filters.append("No Fund.")
     if filters.get('has_lights') is False:
         active_filters.append("No LIGHTS")
-    if filters.get('high_sth_only'):
-        active_filters.append("Hi STH")
+    if filters.get('high_eni_only'):
+        active_filters.append("Hi ENI")
     # Note: highlight_sth and highlight_eni are visual-only, not shown in filter summary
 
     if active_filters:

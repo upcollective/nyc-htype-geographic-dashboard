@@ -380,43 +380,41 @@ def filter_schools(
 
 def filter_by_training_status(df: pd.DataFrame, status: str) -> pd.DataFrame:
     """
-    Filter schools by training status (global filter - task-oriented).
+    Filter schools by training status mode (global filter - task-oriented).
 
-    This is a user-friendly filter that affects ALL views
+    This is a mode selector that affects ALL views
     (Map, Statistics, Indicators, Data Table).
+
+    Each mode provides a tailored stats panel for that workflow:
+    - 📊 Overview: Full picture - all schools with training breakdown
+    - ✅ Trained Schools: Progress view - schools with any training
+    - 🎯 Need Fundamentals: Outreach targets - schools with no training
+    - 🎯 Need LIGHTS: Next step ready - have Fundamentals, need LIGHTS
 
     Args:
         df: School DataFrame
-        status: One of:
-            - 'Training Coverage' - Schools with ANY training (default)
-            - 'Outreach Targets' - Schools with NO training
-            - 'Fundamentals Only' - Has Fundamentals training
-            - 'LIGHTS Only' - Has LIGHTS ToT training
-            - 'Complete Training' - Has BOTH Fundamentals AND LIGHTS
-            - 'All Schools (Reference)' - No filtering (full universe)
+        status: One of the mode names above
 
     Returns:
         Filtered DataFrame
     """
-    if status == 'All Schools (Reference)' or not status:
+    if status == '📊 Overview' or not status:
+        # Full universe - no filtering
         return df
 
     filtered = df.copy()
 
-    if status == 'Training Coverage':
+    if status == '✅ Trained Schools':
         # Schools with ANY training (Fundamentals OR LIGHTS)
         mask = (filtered['has_fundamentals'] == 'Yes') | (filtered['has_lights'] == 'Yes')
         return filtered[mask]
-    elif status == 'Outreach Targets':
-        # Schools with NO training - uniform gray dots
+    elif status == '🎯 Need Fundamentals':
+        # Schools with NO training at all - outreach targets
         mask = (filtered['has_fundamentals'] == 'No') & (filtered['has_lights'] == 'No')
         return filtered[mask]
-    elif status == 'Fundamentals Only':
-        return filtered[filtered['has_fundamentals'] == 'Yes']
-    elif status == 'LIGHTS Only':
-        return filtered[filtered['has_lights'] == 'Yes']
-    elif status == 'Complete Training':
-        mask = (filtered['has_fundamentals'] == 'Yes') & (filtered['has_lights'] == 'Yes')
+    elif status == '🎯 Need LIGHTS':
+        # Schools with Fundamentals but NO LIGHTS - ready for next step
+        mask = (filtered['has_fundamentals'] == 'Yes') & (filtered['has_lights'] == 'No')
         return filtered[mask]
 
     return df
@@ -528,15 +526,26 @@ def filter_schools_by_layers(
     return df[df['school_dbn'].isin(matching_dbns)]
 
 
-def calculate_summary_stats(df: pd.DataFrame, full_df: Optional[pd.DataFrame] = None) -> dict:
+def calculate_summary_stats(
+    df: pd.DataFrame,
+    full_df: Optional[pd.DataFrame] = None,
+    mode: str = '📊 Overview'
+) -> dict:
     """
     Calculate summary statistics for the filtered data.
+
+    Stats are tailored to each mode for clarity:
+    - 📊 Overview: Full picture with training breakdown
+    - ✅ Trained Schools: Progress view with "remaining" reference
+    - 🎯 Need Fundamentals: Outreach targets with priority counts
+    - 🎯 Need LIGHTS: Next step ready with high school focus
 
     Args:
         df: Filtered DataFrame (respects all filters including training status)
         full_df: Optional full DataFrame (geographic filters only, no training status filter).
-                 Used for "universe" reference metrics like priority_schools and no_training
-                 that should always show the big picture for strategic awareness.
+                 Used for "universe" reference metrics like priority_schools, remaining,
+                 and no_training that should always show the big picture for strategic awareness.
+        mode: Current view mode (affects which stats are calculated)
     """
     total = len(df)
     mappable = df['has_coordinates'].sum() if 'has_coordinates' in df.columns else total
@@ -545,23 +554,55 @@ def calculate_summary_stats(df: pd.DataFrame, full_df: Optional[pd.DataFrame] = 
     universe_df = full_df if full_df is not None else df
     universe_total = len(universe_df)
 
+    # Core training status counts (from filtered view)
+    # New nomenclature: "LIGHTS Trained" (was "Complete"), "Fundamentals Only" (was "Partial")
+    lights_trained = len(df[df['training_status'] == 'Complete'])
+    fundamentals_only_count = len(df[df['has_fundamentals'] == 'Yes']) - lights_trained
+    not_started = len(df[df['training_status'] == 'No Training'])
+
     stats = {
         'total_schools': total,
         'mappable_schools': mappable,
-        'complete': len(df[df['training_status'] == 'Complete']),
+        # New nomenclature
+        'lights_trained': lights_trained,
+        'fundamentals_only': fundamentals_only_count,
+        'not_started': not_started,
+        # Legacy names (for backward compatibility with stats_panel.py until updated)
+        'complete': lights_trained,
         'partial': len(df[df['training_status'].isin(['Fundamentals Only', 'LIGHTS Only'])]),
-        'no_training': len(df[df['training_status'] == 'No Training']),
+        'no_training': not_started,
         'total_participants': df['total_participants'].sum() if 'total_participants' in df.columns else 0,
     }
 
     # Calculate percentages - all based on filtered total for consistency
-    # This ensures: Total = Complete + Partial + No Training, and percentages sum to 100%
+    # This ensures: Total = LIGHTS Trained + Fundamentals Only + Not Started, and percentages sum to 100%
     if total > 0:
-        stats['complete_pct'] = round(stats['complete'] / total * 100, 1)
+        stats['lights_trained_pct'] = round(lights_trained / total * 100, 1)
+        stats['fundamentals_only_pct'] = round(fundamentals_only_count / total * 100, 1)
+        stats['not_started_pct'] = round(not_started / total * 100, 1)
+        # Legacy percentage names
+        stats['complete_pct'] = stats['lights_trained_pct']
         stats['partial_pct'] = round(stats['partial'] / total * 100, 1)
-        stats['no_training_pct'] = round(stats['no_training'] / total * 100, 1)
+        stats['no_training_pct'] = stats['not_started_pct']
     else:
+        stats['lights_trained_pct'] = stats['fundamentals_only_pct'] = stats['not_started_pct'] = 0
         stats['complete_pct'] = stats['partial_pct'] = stats['no_training_pct'] = 0
+
+    # "Remaining" schools - universe count of untrained (for Trained Schools mode)
+    # Shows global context: "You've trained X, Y remain"
+    universe_not_started = len(universe_df[universe_df['training_status'] == 'No Training'])
+    stats['remaining'] = universe_not_started
+
+    # Prerequisite issues: Schools with LIGHTS but no Fundamentals (data quality indicator)
+    # This is rare but indicates either data issues or prerequisite bypasses
+    prereq_mask = (universe_df['has_lights'] == 'Yes') & (universe_df['has_fundamentals'] == 'No')
+    stats['prereq_issues'] = prereq_mask.sum()
+
+    # High school count (for Need LIGHTS mode - these need LIGHTS urgently)
+    if 'school_type' in df.columns:
+        stats['high_schools_count'] = len(df[df['school_type'] == 'High School'])
+    else:
+        stats['high_schools_count'] = 0
 
     # STH statistics (separate indicator) - from filtered view
     if 'sth_percent' in df.columns:
@@ -582,11 +623,15 @@ def calculate_summary_stats(df: pd.DataFrame, full_df: Optional[pd.DataFrame] = 
             stats['high_eni_count'] = df['high_eni'].sum()
 
     # Priority schools: high ENI + no training - uses universe_df for strategic awareness
+    # This metric is special: it shows "outreach targets" regardless of training filter
+    # (e.g., when viewing "Training Coverage", you still see how many high-need schools await outreach)
     # ENI (Economic Need Index) is a composite vulnerability indicator that captures
     # multiple factors including STH, making it better for prioritization than STH alone
-    # (always shows actionable outreach targets regardless of training status filter)
     if 'high_eni' in universe_df.columns and 'training_status' in universe_df.columns:
         priority_mask = (universe_df['high_eni'] == True) & (universe_df['training_status'] == 'No Training')
         stats['priority_schools'] = priority_mask.sum()
+
+    # Mode-specific reference stats for context panels
+    stats['mode'] = mode
 
     return stats
