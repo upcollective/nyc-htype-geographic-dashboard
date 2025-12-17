@@ -90,6 +90,28 @@ st.markdown("""
         padding: 0.25rem 0 !important;
     }
 
+    /* Mobile responsive: Force 2-column grid for metrics on small screens */
+    @media (max-width: 768px) {
+        /* Target horizontal blocks containing metrics - force 2-column grid */
+        [data-testid="stHorizontalBlock"]:has([data-testid="stMetric"]) {
+            display: grid !important;
+            grid-template-columns: 1fr 1fr !important;
+            gap: 0.5rem !important;
+        }
+        /* Ensure each column fills its grid cell */
+        [data-testid="stHorizontalBlock"]:has([data-testid="stMetric"]) > [data-testid="column"] {
+            width: 100% !important;
+            flex: none !important;
+        }
+        /* Slightly smaller metrics on mobile for better fit */
+        [data-testid="stMetricValue"] {
+            font-size: 1rem !important;
+        }
+        [data-testid="stMetricLabel"] {
+            font-size: 0.6rem !important;
+        }
+    }
+
     /* Style horizontal radio as tabs */
     div[data-testid="stHorizontalBlock"]:has(div[data-testid="stRadio"]) {
         border-bottom: 1px solid #e0e0e0;
