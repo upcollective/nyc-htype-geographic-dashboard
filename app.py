@@ -158,7 +158,7 @@ st.markdown("""
 def load_data():
     """Load and cache school data from Google Sheets.
 
-    Cache version: 2 - force refresh for STH/ENI normalization fix
+    Cache version: 6 - Fixed credentials detection for local development
     """
     try:
         return load_school_data()

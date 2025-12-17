@@ -120,13 +120,18 @@ def load_from_google_sheets(
     # Get credentials - Streamlit Cloud uses secrets, local uses file
     import streamlit as st
 
-    if hasattr(st, 'secrets') and len(st.secrets) > 0:
-        # Running on Streamlit Cloud - MUST use secrets
-        if "gcp_service_account" not in st.secrets:
-            raise RuntimeError(
-                "Streamlit Cloud deployment requires gcp_service_account in secrets. "
-                "Go to App Settings > Secrets and add your service account credentials."
-            )
+    # Check if running on Streamlit Cloud with secrets configured
+    # Note: len(st.secrets) throws an exception if no secrets exist, so we use try/except
+    use_secrets = False
+    try:
+        if "gcp_service_account" in st.secrets:
+            use_secrets = True
+    except Exception:
+        # No secrets configured - will use file credentials
+        pass
+
+    if use_secrets:
+        # Running on Streamlit Cloud with secrets configured
         credentials = Credentials.from_service_account_info(
             dict(st.secrets["gcp_service_account"]),
             scopes=scopes
@@ -259,14 +264,15 @@ def load_school_data() -> pd.DataFrame:
     df['has_coordinates'] = df['latitude'].notna() & df['longitude'].notna()
 
     # Load and merge vulnerability data from Google Sheets
-    try:
-        vuln_df = load_vulnerability_data()
-        if len(vuln_df) > 0:
-            df = merge_vulnerability_with_training(df, vuln_df)
-            logger.info(f"Merged vulnerability data for {len(df)} schools")
-    except Exception as e:
-        # If vulnerability data fails to load, continue without it
-        logger.warning(f"Could not load vulnerability data: {e}")
+    # NO FALLBACK - fail loudly if Vulnerability_Indicators tab doesn't work
+    vuln_df = load_vulnerability_data()
+    logger.info(f"Loaded vulnerability data: {len(vuln_df)} rows")
+
+    if len(vuln_df) > 0:
+        df = merge_vulnerability_with_training(df, vuln_df)
+        logger.info(f"Merged vulnerability data for {len(df)} schools")
+    else:
+        logger.warning("Vulnerability data is empty!")
 
     return df
 
