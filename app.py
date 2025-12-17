@@ -185,7 +185,7 @@ def main():
 
     # Subtle data refresh at bottom of sidebar
     with st.sidebar:
-        st.caption("─" * 20)
+        st.divider()
         col1, col2 = st.columns([1, 1])
         with col1:
             st.caption("Data cached 1hr")
