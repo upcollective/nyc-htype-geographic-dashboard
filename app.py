@@ -156,7 +156,10 @@ st.markdown("""
 
 @st.cache_data(ttl=3600)  # Cache for 1 hour
 def load_data():
-    """Load and cache school data from Google Sheets."""
+    """Load and cache school data from Google Sheets.
+
+    Cache version: 2 - force refresh for STH/ENI normalization fix
+    """
     try:
         return load_school_data()
     except Exception as e:
