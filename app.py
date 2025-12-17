@@ -173,6 +173,18 @@ def main():
     # No header - title shows in browser tab, tabs provide context
     # This maximizes map space (Google Maps approach)
 
+    # Sidebar: Data refresh button at top
+    with st.sidebar:
+        st.markdown("#### 🔄 Data Controls")
+        col1, col2 = st.columns([2, 1])
+        with col1:
+            if st.button("🔄 Refresh Data", use_container_width=True, help="Clear cache and reload from Google Sheets"):
+                st.cache_data.clear()
+                st.rerun()
+        with col2:
+            st.caption("1hr cache")
+        st.divider()
+
     # Load data
     with st.spinner("Loading school data..."):
         df = load_data()
