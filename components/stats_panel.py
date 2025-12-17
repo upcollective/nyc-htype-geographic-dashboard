@@ -32,25 +32,22 @@ def render_stats_panel(stats: dict, df: pd.DataFrame):
     with col2:
         st.metric(
             label="Complete Training",
-            value=f"{stats['complete']:,}",
-            delta=f"{stats['complete_pct']}%",
-            delta_color="normal"
+            value=f"{stats['complete']:,} ({stats['complete_pct']}%)",
+            help="Schools with both Fundamentals and LIGHTS training"
         )
 
     with col3:
         st.metric(
             label="Partial Training",
-            value=f"{stats['partial']:,}",
-            delta=f"{stats['partial_pct']}%",
-            delta_color="off"
+            value=f"{stats['partial']:,} ({stats['partial_pct']}%)",
+            help="Schools with Fundamentals only or LIGHTS only"
         )
 
     with col4:
         st.metric(
             label="No Training",
-            value=f"{stats['no_training']:,}",
-            delta=f"{stats['no_training_pct']}%",
-            delta_color="inverse"
+            value=f"{stats['no_training']:,} ({stats['no_training_pct']}%)",
+            help="Schools with no HTYPE training recorded"
         )
 
     # Indicator metrics row (if data available)
@@ -62,7 +59,7 @@ def render_stats_panel(stats: dict, df: pd.DataFrame):
             st.metric(
                 label="⚠️ Priority Schools",
                 value=f"{priority:,}",
-                help="High STH (≥30%) + No training"
+                help="High ENI (≥85%) + No training - vulnerable schools needing outreach"
             )
 
         with col6:
