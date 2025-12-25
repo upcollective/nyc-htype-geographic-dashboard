@@ -1,6 +1,6 @@
 """
 HTYPE Geographic Intelligence Dashboard
-Version: 2025-12-25-v5-clear-in-header
+Version: 2025-12-25-v6-filter-overlay
 
 An interactive visualization tool for NYC schools showing:
 - Human trafficking prevention education (HTYPE) training coverage
@@ -224,6 +224,37 @@ st.markdown("""
         background: #f0f0f0 !important;
         border-color: #ccc !important;
     }
+
+    /* Floating filter overlay - positioned in upper right of map area */
+    .filter-overlay {
+        position: fixed;
+        top: 70px;
+        right: 20px;
+        z-index: 1000;
+        background: rgba(255, 255, 255, 0.92);
+        backdrop-filter: blur(8px);
+        -webkit-backdrop-filter: blur(8px);
+        padding: 8px 14px;
+        border-radius: 8px;
+        box-shadow: 0 2px 8px rgba(0,0,0,0.12);
+        font-size: 12px;
+        display: flex;
+        gap: 12px;
+        align-items: center;
+        max-width: 400px;
+        border: 1px solid rgba(0,0,0,0.08);
+    }
+    .filter-overlay .filter-text {
+        color: #444;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+    }
+    .filter-overlay .filter-count {
+        font-weight: 600;
+        color: #1a73e8;
+        white-space: nowrap;
+    }
 </style>
 """, unsafe_allow_html=True)
 
@@ -307,9 +338,6 @@ def main():
     # (priority_schools and remaining should always show the big picture)
     stats = calculate_summary_stats(filtered_df, full_df=geo_filtered_df, mode=mode)
 
-    # Show filter summary if filters are active
-    render_filter_summary(filters, len(df), len(filtered_df))
-
     # Dashboard header
     st.markdown(
         f'''<div class="dashboard-header">
@@ -345,6 +373,9 @@ def main():
         # Compact stats at top (no divider - flows directly into map)
         # Mode determines which tailored stats panel to show
         render_stats_panel(stats, filtered_df, mode=mode)
+
+        # Filter overlay (floats in upper right of map)
+        render_filter_summary(filters, len(df), len(filtered_df))
 
         # Get layer config and map view from filters (set in sidebar)
         layer_config = filters.get('layer_config', {})

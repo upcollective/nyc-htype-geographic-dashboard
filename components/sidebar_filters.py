@@ -453,7 +453,12 @@ def render_sidebar_filters(df: pd.DataFrame) -> dict:
 
 
 def render_filter_summary(filters: dict, total_count: int, filtered_count: int):
-    """Display a compact inline badge showing active filters."""
+    """
+    Display filter summary as a floating overlay in the upper-right of the map.
+
+    Only renders when filters are active (not default Overview mode).
+    Uses a semi-transparent glass-like design that integrates with the map.
+    """
     active_filters = []
 
     if filters.get('search_query'):
@@ -475,20 +480,16 @@ def render_filter_summary(filters: dict, total_count: int, filtered_count: int):
         active_filters.append("No LIGHTS")
     if filters.get('high_eni_only'):
         active_filters.append("Hi ENI")
-    # Note: highlight_sth and highlight_eni are visual-only, not shown in filter summary
 
     if active_filters:
-        # Calculate percentage
         pct = (filtered_count / total_count * 100) if total_count > 0 else 0
-
-        # Compact inline badge
         filter_text = ' • '.join(active_filters)
+
+        # Floating overlay - rendered with a special class for CSS positioning
         st.markdown(
-            f"""<div style="background:#f0f2f6; padding:6px 12px; border-radius:4px;
-                font-size:12px; display:flex; justify-content:space-between; align-items:center;
-                margin-bottom:8px;">
-                <span style="color:#555;">🔍 {filter_text}</span>
-                <span style="font-weight:600; color:#333;">{filtered_count:,} schools ({pct:.0f}%)</span>
+            f"""<div class="filter-overlay">
+                <span class="filter-text">🔍 {filter_text}</span>
+                <span class="filter-count">{filtered_count:,} ({pct:.0f}%)</span>
             </div>""",
             unsafe_allow_html=True
         )
