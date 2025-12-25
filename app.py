@@ -1,6 +1,6 @@
 """
 HTYPE Geographic Intelligence Dashboard
-Version: 2025-12-25-v18-global-anti-truncation
+Version: 2025-12-25-v19-proper-responsive
 
 An interactive visualization tool for NYC schools showing:
 - Human trafficking prevention education (HTYPE) training coverage
@@ -83,64 +83,73 @@ st.markdown("""
         padding-top: 0 !important;
     }
 
-    /* Compact metrics - GLOBAL anti-truncation fix */
+    /* Stat card metrics - proper truncation (NOT character breaking) */
     [data-testid="stMetricValue"] {
         font-size: 1.5rem !important;
         line-height: 1.1 !important;
         font-weight: 600 !important;
+        white-space: nowrap !important;
+        overflow: hidden !important;
+        text-overflow: ellipsis !important;
     }
-    /* CRITICAL FIX: Prevent ALL label truncation globally */
     [data-testid="stMetricLabel"] {
-        font-size: 0.7rem !important;
+        font-size: 0.75rem !important;
         line-height: 1.2 !important;
-        white-space: normal !important;
-        overflow: visible !important;
-        text-overflow: clip !important;
-        word-wrap: break-word !important;
-    }
-    /* Also target inner elements that might have truncation */
-    [data-testid="stMetricLabel"] > div,
-    [data-testid="stMetricLabel"] p,
-    [data-testid="stMetricLabel"] span {
-        white-space: normal !important;
-        overflow: visible !important;
-        text-overflow: clip !important;
+        white-space: nowrap !important;
+        overflow: hidden !important;
+        text-overflow: ellipsis !important;
     }
     [data-testid="stMetricDelta"] {
         font-size: 0.65rem !important;
     }
     [data-testid="stMetric"] {
         padding: 0.15rem 0 !important;
-        min-width: 0 !important;
+        min-width: 120px !important;  /* Prevent over-compression */
     }
 
-    /* Force 2-column grid for metrics at medium and smaller screens */
-    @media (max-width: 1200px) {
+    /* Large screens with sidebar: switch to 2 columns earlier */
+    /* Sidebar is ~250px, so at 1400px viewport, content is ~1150px */
+    @media (max-width: 1400px) {
         [data-testid="stHorizontalBlock"]:has([data-testid="stMetric"]) {
             display: grid !important;
             grid-template-columns: 1fr 1fr !important;
-            gap: 0.5rem !important;
+            gap: 0.75rem !important;
         }
         [data-testid="stHorizontalBlock"]:has([data-testid="stMetric"]) > [data-testid="column"] {
             width: 100% !important;
             flex: none !important;
-            min-width: 0 !important;
         }
         [data-testid="stMetricValue"] {
-            font-size: 1.3rem !important;
+            font-size: 1.4rem !important;
+        }
+        [data-testid="stMetricLabel"] {
+            font-size: 0.7rem !important;
+        }
+    }
+
+    /* Tablet/medium: smaller text */
+    @media (max-width: 1000px) {
+        [data-testid="stMetricValue"] {
+            font-size: 1.2rem !important;
         }
         [data-testid="stMetricLabel"] {
             font-size: 0.65rem !important;
         }
+        [data-testid="stMetric"] {
+            min-width: 100px !important;
+        }
     }
 
-    /* Mobile: smaller text */
+    /* Mobile: even smaller */
     @media (max-width: 600px) {
         [data-testid="stMetricValue"] {
-            font-size: 1.1rem !important;
+            font-size: 1rem !important;
         }
         [data-testid="stMetricLabel"] {
             font-size: 0.6rem !important;
+        }
+        [data-testid="stMetric"] {
+            min-width: 80px !important;
         }
     }
 
@@ -221,10 +230,25 @@ st.markdown("""
         padding: 0.5rem 0;
         border-bottom: 1px solid #eee;
         margin-bottom: 0.5rem;
+        flex-wrap: wrap;
+        gap: 0.25rem;
     }
     .dashboard-header h4 {
         margin: 0 !important;
         padding: 0 !important;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        min-width: 0;
+    }
+    /* Responsive header: smaller text on narrow screens */
+    @media (max-width: 600px) {
+        .dashboard-header h4 {
+            font-size: 1rem !important;
+        }
+        .dashboard-header span {
+            font-size: 11px !important;
+        }
     }
 
     /* Compact sidebar header row (Filters title + X button) */
