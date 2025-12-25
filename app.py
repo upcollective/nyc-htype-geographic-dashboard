@@ -1,6 +1,6 @@
 """
 HTYPE Geographic Intelligence Dashboard
-Version: 2025-12-25-v8-filter-banners
+Version: 2025-12-25-v9-overlay-position
 
 An interactive visualization tool for NYC schools showing:
 - Human trafficking prevention education (HTYPE) training coverage
@@ -225,12 +225,12 @@ st.markdown("""
         border-color: #ccc !important;
     }
 
-    /* Filter overlay - floats in upper right of map, aligned with zoom buttons */
+    /* Filter overlay - floats in upper right of map, LEFT of zoom buttons */
     .filter-overlay {
         position: relative;
         float: right;
         margin-top: -738px;  /* Pull up to align with top of zoom buttons */
-        margin-right: 60px;  /* Space for zoom buttons (they're ~40px wide + padding) */
+        margin-right: 120px;  /* Clear the zoom buttons (~50px) + padding */
         z-index: 100;
         background: rgba(255, 255, 255, 0.95);
         backdrop-filter: blur(8px);
