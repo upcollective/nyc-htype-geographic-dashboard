@@ -452,12 +452,17 @@ def render_sidebar_filters(df: pd.DataFrame) -> dict:
     return filters
 
 
-def render_filter_summary(filters: dict, total_count: int, filtered_count: int):
+def render_filter_summary(filters: dict, total_count: int, filtered_count: int, style: str = 'overlay'):
     """
-    Display filter summary as a floating overlay in the upper-right of the map.
+    Display filter summary showing active filters and school count.
+
+    Args:
+        filters: Current filter settings
+        total_count: Total number of schools
+        filtered_count: Number of schools after filtering
+        style: 'overlay' for map (floating glass effect) or 'banner' for other tabs (inline)
 
     Only renders when filters are active (not default Overview mode).
-    Uses a semi-transparent glass-like design that integrates with the map.
     """
     active_filters = []
 
@@ -485,9 +490,11 @@ def render_filter_summary(filters: dict, total_count: int, filtered_count: int):
         pct = (filtered_count / total_count * 100) if total_count > 0 else 0
         filter_text = ' • '.join(active_filters)
 
-        # Floating overlay - rendered with a special class for CSS positioning
+        # Choose CSS class based on style
+        css_class = 'filter-overlay' if style == 'overlay' else 'filter-banner'
+
         st.markdown(
-            f"""<div class="filter-overlay">
+            f"""<div class="{css_class}">
                 <span class="filter-text">🔍 {filter_text}</span>
                 <span class="filter-count">{filtered_count:,} ({pct:.0f}%)</span>
             </div>""",

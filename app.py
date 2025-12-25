@@ -1,6 +1,6 @@
 """
 HTYPE Geographic Intelligence Dashboard
-Version: 2025-12-25-v7-map-relative-overlay
+Version: 2025-12-25-v8-filter-banners
 
 An interactive visualization tool for NYC schools showing:
 - Human trafficking prevention education (HTYPE) training coverage
@@ -225,12 +225,12 @@ st.markdown("""
         border-color: #ccc !important;
     }
 
-    /* Filter overlay - floats in upper right of map using negative margin trick */
+    /* Filter overlay - floats in upper right of map, aligned with zoom buttons */
     .filter-overlay {
         position: relative;
         float: right;
-        margin-top: -740px;  /* Pull up to overlay the map (map height is 750px) */
-        margin-right: 15px;
+        margin-top: -738px;  /* Pull up to align with top of zoom buttons */
+        margin-right: 60px;  /* Space for zoom buttons (they're ~40px wide + padding) */
         z-index: 100;
         background: rgba(255, 255, 255, 0.95);
         backdrop-filter: blur(8px);
@@ -256,6 +256,26 @@ st.markdown("""
         font-weight: 600;
         color: #1a73e8;
         white-space: nowrap;
+    }
+
+    /* Filter banner for non-map tabs (Statistics, Indicators) - inline style */
+    .filter-banner {
+        background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);
+        padding: 8px 14px;
+        border-radius: 6px;
+        border-left: 3px solid #1a73e8;
+        margin-bottom: 12px;
+        font-size: 12px;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+    }
+    .filter-banner .filter-text {
+        color: #495057;
+    }
+    .filter-banner .filter-count {
+        font-weight: 600;
+        color: #1a73e8;
     }
 </style>
 """, unsafe_allow_html=True)
@@ -415,6 +435,9 @@ def main():
             )
 
     elif active_tab == "📊 Statistics":
+        # Filter banner for non-map view
+        render_filter_summary(filters, len(df), len(filtered_df), style='banner')
+
         col1, col2 = st.columns(2)
 
         with col1:
@@ -432,6 +455,9 @@ def main():
         render_stats_panel(stats, filtered_df)
 
     elif active_tab == "📈 Indicators":
+        # Filter banner for non-map view
+        render_filter_summary(filters, len(df), len(filtered_df), style='banner')
+
         st.subheader("School-Level Indicators")
         st.caption("Each indicator is shown separately for independent analysis")
 
