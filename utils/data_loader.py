@@ -301,14 +301,38 @@ def load_ppr_participating_schools() -> pd.DataFrame:
     )
 
 
-def get_filter_options(df: pd.DataFrame) -> dict:
-    """Extract unique values for filter dropdowns."""
+def get_filter_options(
+    df: pd.DataFrame,
+    selected_boroughs: Optional[list] = None,
+    selected_districts: Optional[list] = None
+) -> dict:
+    """
+    Extract unique values for filter dropdowns with cascading support.
+
+    When boroughs are selected, districts/superintendents/school_types
+    are filtered to only show options relevant to those boroughs.
+    """
+    # Boroughs - always show all (top level)
+    all_boroughs = sorted(df['borough'].dropna().unique().tolist())
+
+    # Start with full dataframe for cascading
+    cascade_df = df.copy()
+
+    # If boroughs selected, filter for downstream options
+    if selected_boroughs and len(selected_boroughs) > 0:
+        cascade_df = cascade_df[cascade_df['borough'].isin(selected_boroughs)]
+
+    # If districts also selected, filter further for superintendent/school_type
+    district_cascade_df = cascade_df.copy()
+    if selected_districts and len(selected_districts) > 0:
+        district_cascade_df = district_cascade_df[district_cascade_df['district'].isin(selected_districts)]
+
     options = {
-        'boroughs': sorted(df['borough'].dropna().unique().tolist()),
-        'districts': sorted(df['district'].dropna().unique().tolist()),
+        'boroughs': all_boroughs,
+        'districts': sorted(cascade_df['district'].dropna().unique().tolist()),
         'training_statuses': ['All', 'Complete', 'Fundamentals Only', 'LIGHTS Only', 'No Training'],
-        'superintendents': sorted(df['superintendent_name'].dropna().unique().tolist()) if 'superintendent_name' in df.columns else [],
-        'school_types': sorted(df['school_type'].dropna().unique().tolist()) if 'school_type' in df.columns else [],
+        'superintendents': sorted(district_cascade_df['superintendent_name'].dropna().unique().tolist()) if 'superintendent_name' in district_cascade_df.columns else [],
+        'school_types': sorted(district_cascade_df['school_type'].dropna().unique().tolist()) if 'school_type' in district_cascade_df.columns else [],
     }
     return options
 

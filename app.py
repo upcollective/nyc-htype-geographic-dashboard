@@ -19,7 +19,6 @@ sys.path.insert(0, str(project_root))
 
 from utils.data_loader import (
     load_school_data,
-    get_filter_options,
     filter_schools,
     filter_by_training_status,
     calculate_summary_stats
@@ -244,11 +243,8 @@ def main():
     with st.spinner("Loading school data..."):
         df = load_data()
 
-    # Get filter options
-    filter_options = get_filter_options(df)
-
-    # Render sidebar filters
-    filters = render_sidebar_filters(filter_options)
+    # Render sidebar filters (passes df for cascading filter options)
+    filters = render_sidebar_filters(df)
 
     # Subtle data refresh at bottom of sidebar
     with st.sidebar:

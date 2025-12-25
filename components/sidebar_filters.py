@@ -9,15 +9,17 @@ can be toggled independently with depth filtering.
 SIDEBAR STRUCTURE (Redesigned Dec 2025):
 1. Analysis Mode (TOP - always visible, not in expander)
 2. Search + Quick Filters
-3. Geography (expander)
+3. Geography (expander) - with cascading filters
 4. Indicator Highlights (expander)
 5. Map Layers (expander - ONLY shown on Map tab)
 """
 import streamlit as st
+import pandas as pd
 from typing import Optional, Dict
 
 # Import layer color info for UI
 from utils.color_schemes import TRAINING_LAYER_COLORS, get_layer_hex_color
+from utils.data_loader import get_filter_options
 
 
 def render_analysis_mode() -> str:
@@ -199,19 +201,19 @@ def render_training_layer_controls(training_status: str = 'All Schools') -> Dict
     return result
 
 
-def render_sidebar_filters(filter_options: dict) -> dict:
+def render_sidebar_filters(df: pd.DataFrame) -> dict:
     """
     Render sidebar filter controls and return selected filter values.
 
     SIDEBAR STRUCTURE:
     1. Analysis Mode (TOP - always visible)
     2. Search + Quick Filters
-    3. Geography (expander)
+    3. Geography (expander) - with cascading filters
     4. Indicator Highlights (expander)
     5. Map Layers (expander - ONLY on Map tab)
 
     Args:
-        filter_options: Dictionary of available filter options from get_filter_options()
+        df: Full school DataFrame for computing cascading filter options
 
     Returns:
         Dictionary of selected filter values
@@ -270,9 +272,21 @@ def render_sidebar_filters(filter_options: dict) -> dict:
     analysis_mode = render_analysis_mode()
 
     # ════════════════════════════════════════════════════════════════════════════
-    # 3. GEOGRAPHY (expander)
+    # 3. GEOGRAPHY (expander) - with CASCADING FILTERS
     # ════════════════════════════════════════════════════════════════════════════
     with st.sidebar.expander("📍 Geography", expanded=False):
+        # Read CURRENT selections from session state for cascading
+        current_boroughs = st.session_state.get('filter_boroughs', [])
+        current_districts = st.session_state.get('filter_districts', [])
+
+        # Get cascading filter options based on current selections
+        filter_options = get_filter_options(
+            df,
+            selected_boroughs=current_boroughs,
+            selected_districts=current_districts
+        )
+
+        # Boroughs (always show all - top level)
         selected_boroughs = st.multiselect(
             "Boroughs",
             options=filter_options.get('boroughs', []),
@@ -281,18 +295,28 @@ def render_sidebar_filters(filter_options: dict) -> dict:
             key="filter_boroughs"
         )
 
+        # Districts (filtered by selected boroughs)
+        # Clean up any previously selected districts that are no longer valid
+        valid_districts = filter_options.get('districts', [])
+        current_district_selection = [d for d in current_districts if d in valid_districts]
+
         selected_districts = st.multiselect(
             "Districts",
-            options=filter_options.get('districts', []),
-            default=[],
-            placeholder="All districts",
+            options=valid_districts,
+            default=current_district_selection,
+            placeholder="All districts" if not selected_boroughs else "Districts in selection",
             key="filter_districts"
         )
 
-        # Superintendent Filter (if available)
+        # Superintendent Filter (filtered by borough/district)
         superintendents = filter_options.get('superintendents', [])
         selected_superintendent = None
         if superintendents:
+            # Check if current selection is still valid
+            current_sup = st.session_state.get('filter_superintendent', 'All')
+            if current_sup != 'All' and current_sup not in superintendents:
+                st.session_state['filter_superintendent'] = 'All'
+
             selected_superintendent = st.selectbox(
                 "Superintendent",
                 options=['All'] + superintendents,
@@ -302,10 +326,15 @@ def render_sidebar_filters(filter_options: dict) -> dict:
             if selected_superintendent == 'All':
                 selected_superintendent = None
 
-        # School Type Filter (if available)
+        # School Type Filter (filtered by borough/district)
         school_types = filter_options.get('school_types', [])
         selected_school_type = None
         if school_types:
+            # Check if current selection is still valid
+            current_type = st.session_state.get('filter_school_type', 'All')
+            if current_type != 'All' and current_type not in school_types:
+                st.session_state['filter_school_type'] = 'All'
+
             selected_school_type = st.selectbox(
                 "School Type",
                 options=['All'] + school_types,
