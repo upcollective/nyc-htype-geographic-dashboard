@@ -123,110 +123,86 @@ def render_indicator_highlight(
 
 def render_training_layer_controls(training_status: str = 'All Schools') -> Dict:
     """
-    Render map layer visibility toggles with optional depth filters (visual only).
-
-    These controls ONLY affect which colored dots appear on the map.
-    They do NOT filter the underlying data - use the Analysis Mode for that.
-
-    Layer availability auto-adjusts based on training_status:
-    - "Need Fundamentals": Layers disabled (no trained schools to show)
-    - "Need LIGHTS": Only Fundamentals layer shown (schools have Fundamentals)
-    - Others: All layers available
-
-    Args:
-        training_status: Current analysis mode value
+    Compact map layer controls with view toggle and training type visibility.
 
     Returns:
-        Dict with layer visibility and depth configuration
+        Dict with 'map_view' ('schools' or 'districts') and layer configs
     """
-    layers = {}
+    result = {}
 
-    # Determine which layers are relevant based on analysis mode
-    # "Need Fundamentals" shows untrained schools (no training layers needed)
+    # === VIEW MODE (top, separated) ===
+    col1, col2 = st.columns([1, 4])
+    with col1:
+        show_districts = st.checkbox(
+            "District view",
+            value=st.session_state.get('map_view_mode', False),
+            key="map_view_mode",
+            label_visibility="collapsed"
+        )
+    with col2:
+        view_label = "📊 Districts" if show_districts else "📍 Schools"
+        st.markdown(f"<span style='font-size:13px;'>{view_label}</span>", unsafe_allow_html=True)
+
+    result['map_view'] = 'districts' if show_districts else 'schools'
+
+    st.caption("─" * 20)  # Visual separator
+
+    # Determine layer availability based on analysis mode
     layers_disabled = training_status == '🎯 Need Fundamentals'
-    fund_default = True  # Fundamentals layer on by default for most modes
-    lights_default = training_status not in ['🎯 Need LIGHTS']  # LIGHTS layer off for Need LIGHTS mode
 
     if layers_disabled:
-        st.caption("ℹ️ Showing untrained schools (uniform gray)")
-        layers['fundamentals'] = {'enabled': False, 'min_depth': 0}
-        layers['lights'] = {'enabled': False, 'min_depth': 0}
-        layers['student_sessions'] = {'enabled': False, 'placeholder': True}
-        return layers
+        st.caption("ℹ️ Untrained schools (gray)")
+        result['fundamentals'] = {'enabled': False, 'min_depth': 0}
+        result['lights'] = {'enabled': False, 'min_depth': 0}
+        result['student_sessions'] = {'enabled': False, 'placeholder': True}
+        return result
 
-    # === FUNDAMENTALS LAYER ===
-    col_toggle, col_label = st.columns([1, 5])
-    with col_toggle:
-        fund_enabled = st.checkbox(
-            "Fundamentals layer",
-            value=fund_default,
-            key="layer_fundamentals",
-            label_visibility="collapsed"
-        )
-    with col_label:
+    # === TRAINING LAYERS (compact inline) ===
+    fund_default = True
+    lights_default = training_status not in ['🎯 Need LIGHTS']
+
+    # Fundamentals
+    col1, col2, col3 = st.columns([1, 2, 2])
+    with col1:
+        fund_enabled = st.checkbox("Fund", value=fund_default, key="layer_fundamentals", label_visibility="collapsed")
+    with col2:
         color_hex = get_layer_hex_color('fundamentals')
-        st.markdown(f"<span style='color:{color_hex}; font-weight:600;'>🔵 Fundamentals</span>", unsafe_allow_html=True)
+        st.markdown(f"<span style='color:{color_hex};font-size:13px;'>🔵 Fundamentals</span>", unsafe_allow_html=True)
+    with col3:
+        if fund_enabled:
+            fund_min_depth = st.slider("Min", 0, 30, 0, 5, key="fund_min_depth", label_visibility="collapsed")
+        else:
+            st.caption("Off")
+            fund_min_depth = 0
+    result['fundamentals'] = {'enabled': fund_enabled, 'min_depth': fund_min_depth}
 
-    # Depth filter for Fundamentals (only show if layer enabled)
-    fund_min_depth = 0
-    if fund_enabled:
-        fund_min_depth = st.slider(
-            "Min participants",
-            min_value=0, max_value=30, value=0, step=5,
-            key="fund_min_depth",
-            help="Only show schools with at least this many trained participants",
-            label_visibility="collapsed"
-        )
-        if fund_min_depth > 0:
-            st.caption(f"Showing schools with {fund_min_depth}+ participants")
-
-    layers['fundamentals'] = {'enabled': fund_enabled, 'min_depth': fund_min_depth}
-
-    # === LIGHTS ToT LAYER ===
-    col_toggle, col_label = st.columns([1, 5])
-    with col_toggle:
-        lights_enabled = st.checkbox(
-            "LIGHTS layer",
-            value=lights_default,
-            key="layer_lights",
-            label_visibility="collapsed"
-        )
-    with col_label:
+    # LIGHTS
+    col1, col2, col3 = st.columns([1, 2, 2])
+    with col1:
+        lights_enabled = st.checkbox("LIGHTS", value=lights_default, key="layer_lights", label_visibility="collapsed")
+    with col2:
         color_hex = get_layer_hex_color('lights')
-        st.markdown(f"<span style='color:{color_hex}; font-weight:600;'>🟣 LIGHTS ToT</span>", unsafe_allow_html=True)
+        st.markdown(f"<span style='color:{color_hex};font-size:13px;'>🟣 LIGHTS ToT</span>", unsafe_allow_html=True)
+    with col3:
+        if lights_enabled:
+            lights_min_depth = st.slider("Min", 0, 15, 0, 1, key="lights_min_depth", label_visibility="collapsed")
+        else:
+            st.caption("Off")
+            lights_min_depth = 0
+    result['lights'] = {'enabled': lights_enabled, 'min_depth': lights_min_depth}
 
-    # Depth filter for LIGHTS (only show if layer enabled)
-    lights_min_depth = 0
-    if lights_enabled:
-        lights_min_depth = st.slider(
-            "Min trainers",
-            min_value=0, max_value=15, value=0, step=1,
-            key="lights_min_depth",
-            help="Only show schools with at least this many LIGHTS trainers",
-            label_visibility="collapsed"
-        )
-        if lights_min_depth > 0:
-            st.caption(f"Showing schools with {lights_min_depth}+ trainers")
-
-    layers['lights'] = {'enabled': lights_enabled, 'min_depth': lights_min_depth}
-
-    # === STUDENT SESSIONS LAYER (PLACEHOLDER) ===
-    col_toggle, col_label = st.columns([1, 5])
-    with col_toggle:
-        st.checkbox(
-            "Student Sessions layer",
-            value=False,
-            key="layer_students",
-            disabled=True,
-            label_visibility="collapsed"
-        )
-    with col_label:
+    # Student Sessions (placeholder)
+    col1, col2, col3 = st.columns([1, 2, 2])
+    with col1:
+        st.checkbox("Students", value=False, key="layer_students", disabled=True, label_visibility="collapsed")
+    with col2:
         color_hex = get_layer_hex_color('student_sessions')
-        st.markdown(f"<span style='color:{color_hex}; font-weight:600;'>🟢 Student Sessions</span> <span style='color:#888; font-size:0.8em;'>(Coming Soon)</span>", unsafe_allow_html=True)
+        st.markdown(f"<span style='color:{color_hex};font-size:13px;'>🟢 Students</span>", unsafe_allow_html=True)
+    with col3:
+        st.caption("Soon")
+    result['student_sessions'] = {'enabled': False, 'placeholder': True}
 
-    layers['student_sessions'] = {'enabled': False, 'placeholder': True}
-
-    return layers
+    return result
 
 
 def render_sidebar_filters(filter_options: dict) -> dict:
@@ -386,12 +362,12 @@ def render_sidebar_filters(filter_options: dict) -> dict:
     # Only render Map Layers controls when on Map tab
     if is_map_tab:
         with st.sidebar.expander("🗺️ Map Layers", expanded=False):
-            st.caption("Toggle training types to show on map")
             layer_config = render_training_layer_controls(analysis_mode)
     else:
         # Provide default layer config when not on map tab
         # (preserves any existing session state values)
         layer_config = {
+            'map_view': 'districts' if st.session_state.get('map_view_mode', False) else 'schools',
             'fundamentals': {
                 'enabled': st.session_state.get('layer_fundamentals', True),
                 'min_depth': st.session_state.get('fund_min_depth', 0)
@@ -403,12 +379,16 @@ def render_sidebar_filters(filter_options: dict) -> dict:
             'student_sessions': {'enabled': False, 'placeholder': True}
         }
 
+    # Extract map_view from layer_config
+    map_view = layer_config.get('map_view', 'schools')
+
     # Build filters dictionary
     filters = {
         'search_query': search_query if search_query else None,
         # Analysis mode (affects ALL views)
         'global_training_status': analysis_mode,
-        # Map layer settings (visual only - affects map tab only)
+        # Map view mode and layer settings
+        'map_view': map_view,
         'layer_config': layer_config,
         # Geographic filters
         'boroughs': selected_boroughs if selected_boroughs else None,

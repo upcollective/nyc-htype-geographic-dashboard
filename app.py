@@ -83,20 +83,21 @@ st.markdown("""
         padding-top: 0 !important;
     }
 
-    /* Compact metrics */
+    /* Compact metrics with larger numbers */
     [data-testid="stMetricValue"] {
-        font-size: 1.2rem !important;
-        line-height: 1.2 !important;
+        font-size: 1.6rem !important;
+        line-height: 1.1 !important;
+        font-weight: 600 !important;
     }
     [data-testid="stMetricLabel"] {
         font-size: 0.7rem !important;
-        line-height: 1.1 !important;
+        line-height: 1.0 !important;
     }
     [data-testid="stMetricDelta"] {
         font-size: 0.65rem !important;
     }
     [data-testid="stMetric"] {
-        padding: 0.25rem 0 !important;
+        padding: 0.15rem 0 !important;
     }
 
     /* Mobile responsive: Force 2-column grid for metrics on small screens */
@@ -328,19 +329,9 @@ def main():
         # Mode determines which tailored stats panel to show
         render_stats_panel(stats, filtered_df, mode=mode)
 
-        # Get layer config from filters
+        # Get layer config and map view from filters (set in sidebar)
         layer_config = filters.get('layer_config', {})
-
-        # Map view toggle - compact switch directly above map
-        col_toggle, col_spacer = st.columns([3, 7])
-        with col_toggle:
-            show_districts = st.toggle(
-                "📊 District View",
-                value=False,
-                key="map_view_mode",
-                help="Switch between individual schools and district choropleth"
-            )
-        map_view = 'districts' if show_districts else 'schools'
+        map_view = filters.get('map_view', 'schools')
 
         # Derive choropleth layer from layer_config (first enabled layer)
         choropleth_layer = 'fundamentals'  # default
