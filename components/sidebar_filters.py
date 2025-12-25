@@ -452,7 +452,7 @@ def render_sidebar_filters(df: pd.DataFrame) -> dict:
     return filters
 
 
-def render_filter_summary(filters: dict, total_count: int, filtered_count: int, style: str = 'overlay'):
+def render_filter_summary(filters: dict, total_count: int, filtered_count: int, style: str = 'chip'):
     """
     Display filter summary showing active filters and school count.
 
@@ -460,7 +460,7 @@ def render_filter_summary(filters: dict, total_count: int, filtered_count: int, 
         filters: Current filter settings
         total_count: Total number of schools
         filtered_count: Number of schools after filtering
-        style: 'overlay' for map (floating glass effect) or 'banner' for other tabs (inline)
+        style: 'chip' for map (compact pill above map), 'banner' for other tabs
 
     Only renders when filters are active (not default Overview mode).
     """
@@ -490,13 +490,23 @@ def render_filter_summary(filters: dict, total_count: int, filtered_count: int, 
         pct = (filtered_count / total_count * 100) if total_count > 0 else 0
         filter_text = ' • '.join(active_filters)
 
-        # Choose CSS class based on style
-        css_class = 'filter-overlay' if style == 'overlay' else 'filter-banner'
-
-        st.markdown(
-            f"""<div class="{css_class}">
-                <span class="filter-text">🔍 {filter_text}</span>
-                <span class="filter-count">{filtered_count:,} ({pct:.0f}%)</span>
-            </div>""",
-            unsafe_allow_html=True
-        )
+        if style == 'chip':
+            # Compact chip - right-aligned pill above map
+            st.markdown(
+                f"""<div style="display: flex; justify-content: flex-end; margin-bottom: 4px;">
+                    <div style="background: linear-gradient(135deg, #e3f2fd 0%, #bbdefb 100%); padding: 4px 12px; border-radius: 16px; font-size: 12px; display: inline-flex; gap: 8px; align-items: center; border: 1px solid #90caf9; box-shadow: 0 1px 3px rgba(0,0,0,0.1);">
+                        <span style="color: #1565c0;">🔍 {filter_text}</span>
+                        <span style="background: #1976d2; color: white; padding: 2px 8px; border-radius: 10px; font-weight: 600; font-size: 11px;">{filtered_count:,} ({pct:.0f}%)</span>
+                    </div>
+                </div>""",
+                unsafe_allow_html=True
+            )
+        else:
+            # Banner style for non-map tabs (Statistics, Indicators)
+            st.markdown(
+                f"""<div class="filter-banner">
+                    <span class="filter-text">🔍 {filter_text}</span>
+                    <span class="filter-count">{filtered_count:,} ({pct:.0f}%)</span>
+                </div>""",
+                unsafe_allow_html=True
+            )

@@ -1,6 +1,6 @@
 """
 HTYPE Geographic Intelligence Dashboard
-Version: 2025-12-25-v9-overlay-position
+Version: 2025-12-25-v13-chip-above-map
 
 An interactive visualization tool for NYC schools showing:
 - Human trafficking prevention education (HTYPE) training coverage
@@ -225,37 +225,39 @@ st.markdown("""
         border-color: #ccc !important;
     }
 
-    /* Filter overlay - floats in upper right of map, LEFT of zoom buttons */
-    .filter-overlay {
-        position: relative;
-        float: right;
-        margin-top: -738px;  /* Pull up to align with top of zoom buttons */
-        margin-right: 120px;  /* Clear the zoom buttons (~50px) + padding */
-        z-index: 100;
-        background: rgba(255, 255, 255, 0.95);
-        backdrop-filter: blur(8px);
-        -webkit-backdrop-filter: blur(8px);
-        padding: 6px 12px;
-        border-radius: 6px;
-        box-shadow: 0 2px 6px rgba(0,0,0,0.15);
-        font-size: 11px;
-        display: inline-flex;
-        gap: 10px;
-        align-items: center;
-        max-width: 350px;
-        border: 1px solid rgba(0,0,0,0.1);
-        pointer-events: auto;
+    /* Filter overlay - positioned in upper right of map, LEFT of zoom buttons */
+    /* Using transform instead of margin for more reliable positioning */
+    .map-filter-chip {
+        position: relative !important;
+        float: right !important;
+        margin-top: -740px !important;  /* Pull up into map area */
+        margin-right: 10px !important;  /* Small margin from edge */
+        transform: translateX(-180px) !important;  /* Move further left to clear zoom buttons */
+        z-index: 100 !important;
+        background: rgba(255, 255, 255, 0.95) !important;
+        backdrop-filter: blur(8px) !important;
+        -webkit-backdrop-filter: blur(8px) !important;
+        padding: 6px 12px !important;
+        border-radius: 6px !important;
+        box-shadow: 0 2px 6px rgba(0,0,0,0.15) !important;
+        font-size: 11px !important;
+        display: inline-flex !important;
+        gap: 10px !important;
+        align-items: center !important;
+        max-width: 350px !important;
+        border: 1px solid rgba(0,0,0,0.1) !important;
+        pointer-events: auto !important;
     }
-    .filter-overlay .filter-text {
-        color: #333;
-        white-space: nowrap;
-        overflow: hidden;
-        text-overflow: ellipsis;
+    .map-filter-chip .filter-text {
+        color: #333 !important;
+        white-space: nowrap !important;
+        overflow: hidden !important;
+        text-overflow: ellipsis !important;
     }
-    .filter-overlay .filter-count {
-        font-weight: 600;
-        color: #1a73e8;
-        white-space: nowrap;
+    .map-filter-chip .filter-count {
+        font-weight: 600 !important;
+        color: #1a73e8 !important;
+        white-space: nowrap !important;
     }
 
     /* Filter banner for non-map tabs (Statistics, Indicators) - inline style */
@@ -396,6 +398,9 @@ def main():
         # Mode determines which tailored stats panel to show
         render_stats_panel(stats, filtered_df, mode=mode)
 
+        # Filter chip (inline, above map) - shows active filters
+        render_filter_summary(filters, len(df), len(filtered_df), style='chip')
+
         # Get layer config and map view from filters (set in sidebar)
         layer_config = filters.get('layer_config', {})
         map_view = filters.get('map_view', 'schools')
@@ -413,9 +418,6 @@ def main():
             filtered_df, layer_config, map_view, choropleth_layer,
             highlight_config=highlight_config, height=750
         )
-
-        # Filter overlay (floats in upper right of map via CSS negative margin)
-        render_filter_summary(filters, len(df), len(filtered_df))
 
         # Minimal caption with context-aware info
         if map_view == 'districts':
