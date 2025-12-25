@@ -11,101 +11,34 @@ from typing import Optional
 from utils.color_schemes import TRAINING_COLORS_HEX, BOROUGH_COLORS
 
 
-def _render_responsive_metrics(metrics: list, highlight_last: bool = False):
+def _render_metrics_2col(metrics: list):
     """
-    Render metrics using responsive HTML grid instead of st.columns.
-    This ensures proper wrapping at all viewport sizes.
+    Render metrics in a 2-column layout using st.columns.
+    This simple approach works reliably across all viewport sizes.
 
     Args:
-        metrics: List of dicts with 'label' and 'value' keys
-        highlight_last: If True, render last metric with yellow highlight style
+        metrics: List of dicts with 'label', 'value', and optional 'highlight' keys
     """
-    # Build HTML for each metric card
-    cards_html = []
-    for i, m in enumerate(metrics):
-        is_highlight = highlight_last and i == len(metrics) - 1
-
-        if is_highlight and 'highlight_style' in m:
-            # Special highlighted card (e.g., "Remaining")
-            cards_html.append(f'''
-                <div class="stat-card stat-card-highlight">
-                    <div class="stat-label">{m['label']}</div>
-                    <div class="stat-value">{m['value']}</div>
-                    {f"<div class='stat-sublabel'>{m.get('sublabel', '')}</div>" if m.get('sublabel') else ""}
-                </div>
-            ''')
-        else:
-            cards_html.append(f'''
-                <div class="stat-card">
-                    <div class="stat-label">{m['label']}</div>
-                    <div class="stat-value">{m['value']}</div>
-                </div>
-            ''')
-
-    # Responsive CSS Grid - the key to proper wrapping
-    html = f'''
-    <style>
-        .stats-grid {{
-            display: grid;
-            grid-template-columns: repeat(4, 1fr);
-            gap: 0.75rem;
-            margin-bottom: 0.5rem;
-        }}
-        @media (max-width: 1400px) {{
-            .stats-grid {{ grid-template-columns: repeat(3, 1fr); }}
-        }}
-        @media (max-width: 1000px) {{
-            .stats-grid {{ grid-template-columns: repeat(2, 1fr); }}
-        }}
-        @media (max-width: 500px) {{
-            .stats-grid {{ grid-template-columns: repeat(2, 1fr); gap: 0.5rem; }}
-        }}
-        .stat-card {{
-            background: #f8f9fa;
-            padding: 0.5rem 0.75rem;
-            border-radius: 6px;
-            min-width: 0;
-        }}
-        .stat-card-highlight {{
-            background: #fff3cd;
-            border-left: 3px solid #ffc107;
-        }}
-        .stat-label {{
-            font-size: 0.7rem;
-            color: #666;
-            font-weight: 500;
-            white-space: nowrap;
-            overflow: hidden;
-            text-overflow: ellipsis;
-            margin-bottom: 2px;
-        }}
-        .stat-value {{
-            font-size: 1.4rem;
-            font-weight: 600;
-            color: #333;
-            white-space: nowrap;
-            overflow: hidden;
-            text-overflow: ellipsis;
-        }}
-        .stat-sublabel {{
-            font-size: 0.65rem;
-            color: #856404;
-            margin-top: 2px;
-        }}
-        @media (max-width: 1000px) {{
-            .stat-value {{ font-size: 1.2rem; }}
-            .stat-label {{ font-size: 0.65rem; }}
-        }}
-        @media (max-width: 600px) {{
-            .stat-value {{ font-size: 1rem; }}
-            .stat-label {{ font-size: 0.6rem; }}
-        }}
-    </style>
-    <div class="stats-grid">
-        {"".join(cards_html)}
-    </div>
-    '''
-    st.markdown(html, unsafe_allow_html=True)
+    # Render in pairs (2 columns)
+    for i in range(0, len(metrics), 2):
+        cols = st.columns(2)
+        for j, col in enumerate(cols):
+            idx = i + j
+            if idx < len(metrics):
+                m = metrics[idx]
+                with col:
+                    if m.get('highlight'):
+                        # Highlighted metric (yellow box)
+                        st.markdown(
+                            f"""<div style="background: #fff3cd; padding: 8px 12px; border-radius: 6px; border-left: 3px solid #ffc107;">
+                            <p style="font-size: 0.75rem; color: #856404; margin-bottom: 2px; font-weight: 500;">{m['label']}</p>
+                            <p style="font-size: 1.25rem; font-weight: 600; color: #856404; margin: 0;">{m['value']}</p>
+                            {f"<p style='font-size: 0.7rem; color: #856404; margin: 0;'>{m.get('sublabel', '')}</p>" if m.get('sublabel') else ""}
+                            </div>""",
+                            unsafe_allow_html=True
+                        )
+                    else:
+                        st.metric(label=m['label'], value=m['value'])
 
 
 def render_stats_panel(stats: dict, df: pd.DataFrame, mode: str = '📊 Overview'):
@@ -139,34 +72,34 @@ def render_stats_panel(stats: dict, df: pd.DataFrame, mode: str = '📊 Overview
 def _render_overview_stats(stats: dict):
     """
     📊 Overview Mode: Full picture with training breakdown.
-    Uses responsive HTML grid instead of st.columns for better mobile support.
+    Uses 2-column layout for reliable responsiveness.
     """
-    # Row 1: Training status metrics
-    metrics_row1 = [
+    # All metrics in 2-column layout
+    metrics = [
         {"label": "Total Schools", "value": f"{stats['total_schools']:,}"},
         {"label": "LIGHTS Trained", "value": f"{stats['lights_trained']:,} ({stats['lights_trained_pct']}%)"},
         {"label": "Fundamentals Only", "value": f"{stats['fundamentals_only']:,} ({stats['fundamentals_only_pct']}%)"},
         {"label": "Not Started", "value": f"{stats['not_started']:,} ({stats['not_started_pct']}%)"},
     ]
-    _render_responsive_metrics(metrics_row1)
+    _render_metrics_2col(metrics)
 
-    # Row 2: Vulnerability indicators
+    # Vulnerability indicators
     _render_indicator_row(stats)
 
 
 def _render_trained_schools_stats(stats: dict):
     """
     ✅ Trained Schools Mode: Progress view with remaining reference.
-    Uses responsive HTML grid.
+    Uses 2-column layout.
     """
     remaining = stats.get('remaining', 0)
-    metrics_row1 = [
+    metrics = [
         {"label": "Total Trained", "value": f"{stats['total_schools']:,}"},
         {"label": "LIGHTS Trained", "value": f"{stats['lights_trained']:,} ({stats['lights_trained_pct']}%)"},
         {"label": "Fundamentals Only", "value": f"{stats['fundamentals_only']:,} ({stats['fundamentals_only_pct']}%)"},
-        {"label": "🎯 Remaining", "value": f"{remaining:,}", "sublabel": "Awaiting outreach", "highlight_style": True},
+        {"label": "🎯 Remaining", "value": f"{remaining:,}", "sublabel": "Awaiting outreach", "highlight": True},
     ]
-    _render_responsive_metrics(metrics_row1, highlight_last=True)
+    _render_metrics_2col(metrics)
 
     # Indicator metrics row
     _render_indicator_row(stats)
@@ -175,7 +108,7 @@ def _render_trained_schools_stats(stats: dict):
 def _render_need_fundamentals_stats(stats: dict):
     """
     🎯 Need Fundamentals Mode: Outreach targets with priority focus.
-    Uses responsive HTML grid.
+    Uses 2-column layout.
     """
     priority = stats.get('priority_schools', 0)
     high_sth = stats.get('high_sth_count', 0)
@@ -183,26 +116,21 @@ def _render_need_fundamentals_stats(stats: dict):
     avg_eni = stats.get('avg_eni')
     avg_sth = stats.get('avg_sth_percent')
 
-    metrics_row1 = [
+    metrics = [
         {"label": "Total Targets", "value": f"{stats['total_schools']:,}"},
         {"label": "⚠️ Priority (High ENI)", "value": f"{priority:,}"},
         {"label": "🏠 High STH", "value": f"{high_sth:,}"},
         {"label": "✓ Prereq Check" if prereq == 0 else "⚠️ Prereq Issues", "value": "OK" if prereq == 0 else f"{prereq:,}"},
-    ]
-    _render_responsive_metrics(metrics_row1)
-
-    # Row 2: Averages
-    metrics_row2 = [
         {"label": "Avg ENI", "value": f"{avg_eni:.1%}" if avg_eni else "N/A"},
         {"label": "Avg STH", "value": f"{avg_sth:.1%}" if avg_sth else "N/A"},
     ]
-    _render_responsive_metrics(metrics_row2)
+    _render_metrics_2col(metrics)
 
 
 def _render_need_lights_stats(stats: dict):
     """
     🎯 Need LIGHTS Mode: Next step ready with high school focus.
-    Uses responsive HTML grid.
+    Uses 2-column layout.
     """
     high_schools = stats.get('high_schools_count', 0)
     high_eni = stats.get('high_eni_count', 0)
@@ -210,26 +138,21 @@ def _render_need_lights_stats(stats: dict):
     avg_eni = stats.get('avg_eni')
     avg_sth = stats.get('avg_sth_percent')
 
-    metrics_row1 = [
+    metrics = [
         {"label": "Total Ready", "value": f"{stats['total_schools']:,}"},
         {"label": "🏫 High Schools", "value": f"{high_schools:,}"},
         {"label": "⚠️ High ENI", "value": f"{high_eni:,}"},
         {"label": "🏠 High STH", "value": f"{high_sth:,}"},
-    ]
-    _render_responsive_metrics(metrics_row1)
-
-    # Row 2: Averages
-    metrics_row2 = [
         {"label": "Avg ENI", "value": f"{avg_eni:.1%}" if avg_eni else "N/A"},
         {"label": "Avg STH", "value": f"{avg_sth:.1%}" if avg_sth else "N/A"},
     ]
-    _render_responsive_metrics(metrics_row2)
+    _render_metrics_2col(metrics)
 
 
 def _render_indicator_row(stats: dict):
     """
     Render vulnerability indicator metrics row (common to Overview and Trained Schools modes).
-    Uses responsive HTML grid.
+    Uses 2-column layout.
     """
     if stats.get('avg_sth_percent') is not None or stats.get('avg_eni') is not None:
         priority = stats.get('priority_schools', 0)
@@ -243,7 +166,7 @@ def _render_indicator_row(stats: dict):
             {"label": "Avg STH", "value": f"{avg_sth:.1%}" if avg_sth else "N/A"},
             {"label": "Avg ENI", "value": f"{avg_eni:.1%}" if avg_eni else "N/A"},
         ]
-        _render_responsive_metrics(metrics)
+        _render_metrics_2col(metrics)
 
 
 def render_training_status_chart(df: pd.DataFrame):
