@@ -1,6 +1,6 @@
 """
 HTYPE Geographic Intelligence Dashboard
-Version: 2025-12-25-v16-responsive-tablet-fix
+Version: 2025-12-25-v18-global-anti-truncation
 
 An interactive visualization tool for NYC schools showing:
 - Human trafficking prevention education (HTYPE) training coverage
@@ -83,38 +83,49 @@ st.markdown("""
         padding-top: 0 !important;
     }
 
-    /* Compact metrics with larger numbers */
+    /* Compact metrics - GLOBAL anti-truncation fix */
     [data-testid="stMetricValue"] {
-        font-size: 1.6rem !important;
+        font-size: 1.5rem !important;
         line-height: 1.1 !important;
         font-weight: 600 !important;
     }
+    /* CRITICAL FIX: Prevent ALL label truncation globally */
     [data-testid="stMetricLabel"] {
         font-size: 0.7rem !important;
-        line-height: 1.0 !important;
+        line-height: 1.2 !important;
+        white-space: normal !important;
+        overflow: visible !important;
+        text-overflow: clip !important;
+        word-wrap: break-word !important;
+    }
+    /* Also target inner elements that might have truncation */
+    [data-testid="stMetricLabel"] > div,
+    [data-testid="stMetricLabel"] p,
+    [data-testid="stMetricLabel"] span {
+        white-space: normal !important;
+        overflow: visible !important;
+        text-overflow: clip !important;
     }
     [data-testid="stMetricDelta"] {
         font-size: 0.65rem !important;
     }
     [data-testid="stMetric"] {
         padding: 0.15rem 0 !important;
+        min-width: 0 !important;
     }
 
-    /* Tablet responsive: Force 2-column grid for metrics on medium screens */
-    /* This prevents text truncation like "Total...", "LIGH..." at medium widths */
-    @media (min-width: 769px) and (max-width: 1100px) {
-        /* Target horizontal blocks containing metrics - force 2x2 grid */
+    /* Force 2-column grid for metrics at medium and smaller screens */
+    @media (max-width: 1200px) {
         [data-testid="stHorizontalBlock"]:has([data-testid="stMetric"]) {
             display: grid !important;
             grid-template-columns: 1fr 1fr !important;
-            gap: 0.75rem !important;
+            gap: 0.5rem !important;
         }
-        /* Ensure each column fills its grid cell */
         [data-testid="stHorizontalBlock"]:has([data-testid="stMetric"]) > [data-testid="column"] {
             width: 100% !important;
             flex: none !important;
+            min-width: 0 !important;
         }
-        /* Slightly smaller metrics on tablet for better fit */
         [data-testid="stMetricValue"] {
             font-size: 1.3rem !important;
         }
@@ -123,22 +134,10 @@ st.markdown("""
         }
     }
 
-    /* Mobile responsive: Force 2-column grid for metrics on small screens */
-    @media (max-width: 768px) {
-        /* Target horizontal blocks containing metrics - force 2-column grid */
-        [data-testid="stHorizontalBlock"]:has([data-testid="stMetric"]) {
-            display: grid !important;
-            grid-template-columns: 1fr 1fr !important;
-            gap: 0.5rem !important;
-        }
-        /* Ensure each column fills its grid cell */
-        [data-testid="stHorizontalBlock"]:has([data-testid="stMetric"]) > [data-testid="column"] {
-            width: 100% !important;
-            flex: none !important;
-        }
-        /* Slightly smaller metrics on mobile for better fit */
+    /* Mobile: smaller text */
+    @media (max-width: 600px) {
         [data-testid="stMetricValue"] {
-            font-size: 1rem !important;
+            font-size: 1.1rem !important;
         }
         [data-testid="stMetricLabel"] {
             font-size: 0.6rem !important;
