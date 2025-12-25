@@ -254,16 +254,15 @@ def render_sidebar_filters(df: pd.DataFrame) -> dict:
         key="filter_search"
     )
 
-    # Quick Filter Buttons
-    st.sidebar.caption("Quick Filters")
-    col1, col2, col3 = st.sidebar.columns(3)
-
+    # Quick Filter Buttons - 2 columns with clear as small text link
+    col1, col2 = st.sidebar.columns(2)
     with col1:
         no_training = st.button("No Training", use_container_width=True, key="qf_no_training")
     with col2:
         priority_btn = st.button("⚠️ Priority", use_container_width=True, type="primary", key="qf_priority")
-    with col3:
-        clear_filters = st.button("Clear All", use_container_width=True, key="qf_clear")
+
+    # Clear as small text button
+    clear_filters = st.sidebar.button("✕ Clear filters", key="qf_clear", type="tertiary")
 
     # ════════════════════════════════════════════════════════════════════════════
     # 2. ANALYSIS MODE (after quick filters, outside expander)
