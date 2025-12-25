@@ -1007,33 +1007,19 @@ def render_map_info_bar(
     else:
         legend_html = _build_layer_legend_html(layer_config, highlight_config)
 
-    # Build filter chip HTML (right side)
+    # Build filter chip HTML (right side) - all on one line to avoid Streamlit rendering issues
     filter_chip_html = ''
     if filter_info and filter_info.get('active_filters'):
-        filters = filter_info['active_filters']
+        filter_list = filter_info['active_filters']
         filtered_count = filter_info.get('filtered_count', 0)
         total_count = filter_info.get('total_count', 0)
         pct = (filtered_count / total_count * 100) if total_count > 0 else 0
-        filter_text = ' • '.join(filters)
+        filter_text = ' • '.join(filter_list)
+        filter_chip_html = f'<div style="background:linear-gradient(135deg,#e3f2fd 0%,#bbdefb 100%);padding:3px 10px;border-radius:12px;font-size:11px;display:inline-flex;gap:6px;align-items:center;border:1px solid #90caf9;white-space:nowrap;"><span style="color:#1565c0;">🔍 {filter_text}</span><span style="background:#1976d2;color:white;padding:1px 6px;border-radius:8px;font-weight:600;font-size:10px;">{filtered_count:,} ({pct:.0f}%)</span></div>'
 
-        filter_chip_html = f'''
-            <div style="background: linear-gradient(135deg, #e3f2fd 0%, #bbdefb 100%); padding: 4px 12px; border-radius: 16px; font-size: 11px; display: inline-flex; gap: 8px; align-items: center; border: 1px solid #90caf9; box-shadow: 0 1px 2px rgba(0,0,0,0.08); white-space: nowrap;">
-                <span style="color: #1565c0;">🔍 {filter_text}</span>
-                <span style="background: #1976d2; color: white; padding: 2px 8px; border-radius: 10px; font-weight: 600; font-size: 10px;">{filtered_count:,} ({pct:.0f}%)</span>
-            </div>
-        '''
-
-    # Combine into unified info bar with box container
-    st.markdown(f'''
-        <div style="background: linear-gradient(135deg, #fafafa 0%, #f5f5f5 100%); border: 1px solid #e0e0e0; border-radius: 8px; padding: 8px 12px; margin-bottom: 6px; box-shadow: 0 1px 3px rgba(0,0,0,0.06);">
-            <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 8px;">
-                <div style="display: flex; align-items: center; flex-wrap: wrap; gap: 12px;">
-                    {legend_html}
-                </div>
-                {filter_chip_html}
-            </div>
-        </div>
-    ''', unsafe_allow_html=True)
+    # Combine into thin info strip (minimal height) - single line HTML
+    html = f'<div style="display:flex;justify-content:space-between;align-items:center;padding:4px 0;margin-bottom:2px;border-bottom:1px solid #e8e8e8;"><div style="display:flex;align-items:center;gap:16px;">{legend_html}</div>{filter_chip_html}</div>'
+    st.markdown(html, unsafe_allow_html=True)
 
 
 def _build_layer_legend_html(layer_config: Dict, highlight_config: Optional[Dict] = None) -> str:
