@@ -1,6 +1,6 @@
 """
 HTYPE Geographic Intelligence Dashboard
-Version: 2025-12-25-v6-filter-overlay
+Version: 2025-12-25-v7-map-relative-overlay
 
 An interactive visualization tool for NYC schools showing:
 - Human trafficking prevention education (HTYPE) training coverage
@@ -225,27 +225,29 @@ st.markdown("""
         border-color: #ccc !important;
     }
 
-    /* Floating filter overlay - positioned in upper right of map area */
+    /* Filter overlay - floats in upper right of map using negative margin trick */
     .filter-overlay {
-        position: fixed;
-        top: 70px;
-        right: 20px;
-        z-index: 1000;
-        background: rgba(255, 255, 255, 0.92);
+        position: relative;
+        float: right;
+        margin-top: -740px;  /* Pull up to overlay the map (map height is 750px) */
+        margin-right: 15px;
+        z-index: 100;
+        background: rgba(255, 255, 255, 0.95);
         backdrop-filter: blur(8px);
         -webkit-backdrop-filter: blur(8px);
-        padding: 8px 14px;
-        border-radius: 8px;
-        box-shadow: 0 2px 8px rgba(0,0,0,0.12);
-        font-size: 12px;
-        display: flex;
-        gap: 12px;
+        padding: 6px 12px;
+        border-radius: 6px;
+        box-shadow: 0 2px 6px rgba(0,0,0,0.15);
+        font-size: 11px;
+        display: inline-flex;
+        gap: 10px;
         align-items: center;
-        max-width: 400px;
-        border: 1px solid rgba(0,0,0,0.08);
+        max-width: 350px;
+        border: 1px solid rgba(0,0,0,0.1);
+        pointer-events: auto;
     }
     .filter-overlay .filter-text {
-        color: #444;
+        color: #333;
         white-space: nowrap;
         overflow: hidden;
         text-overflow: ellipsis;
@@ -374,9 +376,6 @@ def main():
         # Mode determines which tailored stats panel to show
         render_stats_panel(stats, filtered_df, mode=mode)
 
-        # Filter overlay (floats in upper right of map)
-        render_filter_summary(filters, len(df), len(filtered_df))
-
         # Get layer config and map view from filters (set in sidebar)
         layer_config = filters.get('layer_config', {})
         map_view = filters.get('map_view', 'schools')
@@ -394,6 +393,9 @@ def main():
             filtered_df, layer_config, map_view, choropleth_layer,
             highlight_config=highlight_config, height=750
         )
+
+        # Filter overlay (floats in upper right of map via CSS negative margin)
+        render_filter_summary(filters, len(df), len(filtered_df))
 
         # Minimal caption with context-aware info
         if map_view == 'districts':
