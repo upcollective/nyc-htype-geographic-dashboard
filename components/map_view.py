@@ -978,13 +978,184 @@ def render_choropleth_legend(layer_type: str = 'fundamentals') -> None:
     st.markdown(html, unsafe_allow_html=True)
 
 
+def render_map_info_bar(
+    layer_config: Dict,
+    highlight_config: Optional[Dict] = None,
+    map_view: str = 'schools',
+    choropleth_layer: str = 'fundamentals',
+    filter_info: Optional[Dict] = None
+) -> None:
+    """
+    Render unified info bar containing legend and active filter chip.
+
+    Displays on a single line with:
+    - Left: Training layer legend (color codes)
+    - Right: Active filter chip (when filters applied)
+
+    All wrapped in a subtle boxed container for better visibility.
+
+    Args:
+        layer_config: Dict with config for each layer type
+        highlight_config: Dict with 'sth_threshold' and 'eni_threshold'
+        map_view: 'schools' or 'districts'
+        choropleth_layer: Which training layer to show in choropleth mode
+        filter_info: Dict with 'active_filters', 'filtered_count', 'total_count'
+    """
+    # Build legend HTML based on view type
+    if map_view == 'districts':
+        legend_html = _build_choropleth_legend_html(choropleth_layer)
+    else:
+        legend_html = _build_layer_legend_html(layer_config, highlight_config)
+
+    # Build filter chip HTML (right side)
+    filter_chip_html = ''
+    if filter_info and filter_info.get('active_filters'):
+        filters = filter_info['active_filters']
+        filtered_count = filter_info.get('filtered_count', 0)
+        total_count = filter_info.get('total_count', 0)
+        pct = (filtered_count / total_count * 100) if total_count > 0 else 0
+        filter_text = ' • '.join(filters)
+
+        filter_chip_html = f'''
+            <div style="background: linear-gradient(135deg, #e3f2fd 0%, #bbdefb 100%); padding: 4px 12px; border-radius: 16px; font-size: 11px; display: inline-flex; gap: 8px; align-items: center; border: 1px solid #90caf9; box-shadow: 0 1px 2px rgba(0,0,0,0.08); white-space: nowrap;">
+                <span style="color: #1565c0;">🔍 {filter_text}</span>
+                <span style="background: #1976d2; color: white; padding: 2px 8px; border-radius: 10px; font-weight: 600; font-size: 10px;">{filtered_count:,} ({pct:.0f}%)</span>
+            </div>
+        '''
+
+    # Combine into unified info bar with box container
+    st.markdown(f'''
+        <div style="background: linear-gradient(135deg, #fafafa 0%, #f5f5f5 100%); border: 1px solid #e0e0e0; border-radius: 8px; padding: 8px 12px; margin-bottom: 6px; box-shadow: 0 1px 3px rgba(0,0,0,0.06);">
+            <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 8px;">
+                <div style="display: flex; align-items: center; flex-wrap: wrap; gap: 12px;">
+                    {legend_html}
+                </div>
+                {filter_chip_html}
+            </div>
+        </div>
+    ''', unsafe_allow_html=True)
+
+
+def _build_layer_legend_html(layer_config: Dict, highlight_config: Optional[Dict] = None) -> str:
+    """Build HTML for training layer legend (schools view)."""
+    enabled_layers = []
+    for layer_type in ['fundamentals', 'lights', 'student_sessions']:
+        config = layer_config.get(layer_type, {})
+        if config.get('enabled', False) and not config.get('placeholder', False):
+            enabled_layers.append(layer_type)
+
+    # If no training layers enabled, show neutral legend
+    if not enabled_layers:
+        highlight_items = []
+        if highlight_config:
+            sth_threshold = highlight_config.get('sth_threshold')
+            eni_threshold = highlight_config.get('eni_threshold')
+
+            if sth_threshold is not None:
+                pct = int(sth_threshold * 100)
+                highlight_items.append(
+                    f'<span style="display:flex;align-items:center;gap:4px;font-size:12px;">'
+                    f'<span style="width:12px;height:12px;border-radius:50%;background:transparent;border:2px solid #dc3545;"></span>'
+                    f'🏠 STH ≥{pct}%</span>'
+                )
+            if eni_threshold is not None:
+                pct = int(eni_threshold * 100)
+                highlight_items.append(
+                    f'<span style="display:flex;align-items:center;gap:4px;font-size:12px;">'
+                    f'<span style="width:12px;height:12px;border-radius:50%;background:transparent;border:2px solid #ff8c00;"></span>'
+                    f'💰 ENI ≥{pct}%</span>'
+                )
+
+        neutral_legend = (
+            '<span style="display:flex;align-items:center;gap:4px;font-size:12px;">'
+            '<span style="width:12px;height:12px;border-radius:50%;background:#8E99A4;border:1px solid #666;"></span>'
+            '⚪ Untrained Schools</span>'
+        )
+
+        highlight_html = ''
+        if highlight_items:
+            highlight_html = '<span style="display:flex;align-items:center;gap:12px;margin-left:12px;padding-left:12px;border-left:1px solid #ddd;">' + ''.join(highlight_items) + '</span>'
+
+        return neutral_legend + highlight_html
+
+    # Build training layer legend
+    legend_items = []
+    for layer_type in enabled_layers:
+        color = get_layer_hex_color(layer_type)
+        name = get_layer_name(layer_type)
+        emoji = {'fundamentals': '🔵', 'lights': '🟣', 'student_sessions': '🟢'}.get(layer_type, '●')
+        legend_items.append(
+            f'<span style="display:flex;align-items:center;gap:4px;font-size:12px;">'
+            f'<span style="width:12px;height:12px;border-radius:50%;background:{color};border:1px solid #666;"></span>'
+            f'{emoji} {name}</span>'
+        )
+
+    # Size legend
+    size_legend = (
+        '<span style="display:flex;align-items:center;gap:6px;margin-left:12px;padding-left:12px;border-left:1px solid #ddd;font-size:12px;">'
+        '<span style="font-size:10px;color:#666;">Size = depth:</span>'
+        '<span style="width:6px;height:6px;border-radius:50%;background:#888;"></span>'
+        '<span style="width:10px;height:10px;border-radius:50%;background:#888;"></span>'
+        '<span style="width:14px;height:14px;border-radius:50%;background:#888;"></span>'
+        '</span>'
+    )
+
+    # Highlight legend
+    highlight_items = []
+    if highlight_config:
+        sth_threshold = highlight_config.get('sth_threshold')
+        eni_threshold = highlight_config.get('eni_threshold')
+
+        if sth_threshold is not None:
+            pct = int(sth_threshold * 100)
+            highlight_items.append(
+                f'<span style="display:flex;align-items:center;gap:4px;font-size:12px;">'
+                f'<span style="width:12px;height:12px;border-radius:50%;background:transparent;border:2px solid #dc3545;"></span>'
+                f'🏠 STH ≥{pct}%</span>'
+            )
+        if eni_threshold is not None:
+            pct = int(eni_threshold * 100)
+            highlight_items.append(
+                f'<span style="display:flex;align-items:center;gap:4px;font-size:12px;">'
+                f'<span style="width:12px;height:12px;border-radius:50%;background:transparent;border:2px solid #ff8c00;"></span>'
+                f'💰 ENI ≥{pct}%</span>'
+            )
+
+    highlight_html = ''
+    if highlight_items:
+        highlight_html = '<span style="display:flex;align-items:center;gap:12px;margin-left:12px;padding-left:12px;border-left:1px solid #ddd;">' + ''.join(highlight_items) + '</span>'
+
+    return ''.join(legend_items) + size_legend + highlight_html
+
+
+def _build_choropleth_legend_html(layer_type: str = 'fundamentals') -> str:
+    """Build HTML for choropleth coverage legend (districts view)."""
+    color_hex = get_layer_hex_color(layer_type)
+    name = get_layer_name(layer_type)
+
+    return (
+        f'<span style="font-weight:600;font-size:12px;">{name} Coverage:</span>'
+        '<span style="display:flex;align-items:center;gap:4px;font-size:11px;">'
+        '<span style="width:16px;height:12px;background:rgba(220,230,240,0.8);border:1px solid #999;"></span>&lt;20%</span>'
+        '<span style="display:flex;align-items:center;gap:4px;font-size:11px;">'
+        '<span style="width:16px;height:12px;background:rgba(147,186,225,0.8);border:1px solid #999;"></span>20-40%</span>'
+        '<span style="display:flex;align-items:center;gap:4px;font-size:11px;">'
+        '<span style="width:16px;height:12px;background:rgba(65,131,196,0.8);border:1px solid #999;"></span>40-60%</span>'
+        '<span style="display:flex;align-items:center;gap:4px;font-size:11px;">'
+        '<span style="width:16px;height:12px;background:rgba(45,100,160,0.9);border:1px solid #999;"></span>60-80%</span>'
+        '<span style="display:flex;align-items:center;gap:4px;font-size:11px;">'
+        '<span style="width:16px;height:12px;background:rgba(31,82,132,0.95);border:1px solid #999;"></span>&gt;80%</span>'
+    )
+
+
 def render_map_with_view_toggle(
     df: pd.DataFrame,
     layer_config: Dict,
     map_view: str = 'schools',
     choropleth_layer: str = 'fundamentals',
     highlight_config: Optional[Dict] = None,
-    height: int = 600
+    height: int = 600,
+    filter_info: Optional[Dict] = None
 ) -> None:
     """
     Render map with support for both schools and district choropleth views.
@@ -996,16 +1167,21 @@ def render_map_with_view_toggle(
         choropleth_layer: Which training layer to show in choropleth mode
         highlight_config: Dict with 'sth_threshold' and 'eni_threshold' for visual highlights
         height: Map height in pixels
+        filter_info: Dict with active filter details for info bar display
     """
+    # Render unified info bar with legend + filter chip
+    render_map_info_bar(
+        layer_config=layer_config,
+        highlight_config=highlight_config,
+        map_view=map_view,
+        choropleth_layer=choropleth_layer,
+        filter_info=filter_info
+    )
+
+    # Render the appropriate map type
     if map_view == 'districts':
-        # Use the explicitly selected choropleth layer
         layer_type = choropleth_layer or 'fundamentals'
-
-        # Get filter settings from layer_config for the selected layer
         layer_filter_config = layer_config.get(layer_type, {})
-
-        render_choropleth_legend(layer_type)
         render_choropleth_map(df, layer_type, layer_filter_config, height=height)
     else:
-        render_layer_legend(layer_config, highlight_config)
         render_map_with_layers(df, layer_config, highlight_config=highlight_config, height=height)

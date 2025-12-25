@@ -1,6 +1,6 @@
 """
 HTYPE Geographic Intelligence Dashboard
-Version: 2025-12-25-v13-chip-above-map
+Version: 2025-12-25-v14-unified-info-bar
 
 An interactive visualization tool for NYC schools showing:
 - Human trafficking prevention education (HTYPE) training coverage
@@ -398,8 +398,30 @@ def main():
         # Mode determines which tailored stats panel to show
         render_stats_panel(stats, filtered_df, mode=mode)
 
-        # Filter chip (inline, above map) - shows active filters
-        render_filter_summary(filters, len(df), len(filtered_df), style='chip')
+        # Build filter_info for unified info bar (legend + filter chip on same line)
+        active_filters = []
+        if filters.get('search_query'):
+            active_filters.append(f"'{filters['search_query']}'")
+        if filters.get('boroughs'):
+            active_filters.append(', '.join(filters['boroughs']))
+        if filters.get('districts'):
+            districts_str = ', '.join(map(str, filters['districts'][:3]))
+            if len(filters['districts']) > 3:
+                districts_str += f" +{len(filters['districts']) - 3}"
+            active_filters.append(f"D{districts_str}")
+        if filters.get('global_training_status') and filters['global_training_status'] != '📊 Overview':
+            active_filters.append(filters['global_training_status'])
+        if filters.get('superintendent'):
+            sup = filters['superintendent']
+            active_filters.append(sup[:15] + "..." if len(sup) > 15 else sup)
+        if filters.get('high_eni_only'):
+            active_filters.append("Hi ENI")
+
+        filter_info = {
+            'active_filters': active_filters,
+            'filtered_count': len(filtered_df),
+            'total_count': len(df)
+        } if active_filters else None
 
         # Get layer config and map view from filters (set in sidebar)
         layer_config = filters.get('layer_config', {})
@@ -413,10 +435,11 @@ def main():
                 choropleth_layer = lt
                 break
 
-        # Render map with view toggle (handles legend + map for both modes)
+        # Render map with unified info bar (legend + filter chip) + map
         render_map_with_view_toggle(
             filtered_df, layer_config, map_view, choropleth_layer,
-            highlight_config=highlight_config, height=750
+            highlight_config=highlight_config, height=750,
+            filter_info=filter_info
         )
 
         # Minimal caption with context-aware info
