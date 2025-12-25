@@ -261,11 +261,8 @@ def render_sidebar_filters(df: pd.DataFrame) -> dict:
     with col2:
         priority_btn = st.button("⚠️ Priority", use_container_width=True, type="primary", key="qf_priority")
 
-    # Clear as small text button (with reduced bottom margin)
+    # Clear as small text button (CSS in app.py handles spacing)
     clear_filters = st.sidebar.button("✕ Clear filters", key="qf_clear", type="tertiary")
-
-    # Reduce space before divider
-    st.sidebar.markdown('<div style="margin-top:-10px;"></div>', unsafe_allow_html=True)
 
     # ════════════════════════════════════════════════════════════════════════════
     # 2. ANALYSIS MODE (after quick filters, outside expander)
