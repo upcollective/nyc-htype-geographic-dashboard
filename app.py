@@ -1,6 +1,6 @@
 """
 HTYPE Geographic Intelligence Dashboard
-Version: 2025-12-25-v19-proper-responsive
+Version: 2025-12-25-v20-3col-breakpoint
 
 An interactive visualization tool for NYC schools showing:
 - Human trafficking prevention education (HTYPE) training coverage
@@ -104,52 +104,58 @@ st.markdown("""
     }
     [data-testid="stMetric"] {
         padding: 0.15rem 0 !important;
-        min-width: 120px !important;  /* Prevent over-compression */
+        min-width: 90px !important;
     }
 
-    /* Large screens with sidebar: switch to 2 columns earlier */
-    /* Sidebar is ~250px, so at 1400px viewport, content is ~1150px */
-    @media (max-width: 1400px) {
+    /* Breakpoint 1: 3-column layout (1200-1600px with sidebar) */
+    @media (max-width: 1600px) {
         [data-testid="stHorizontalBlock"]:has([data-testid="stMetric"]) {
             display: grid !important;
-            grid-template-columns: 1fr 1fr !important;
-            gap: 0.75rem !important;
+            grid-template-columns: repeat(3, 1fr) !important;
+            gap: 0.5rem !important;
         }
         [data-testid="stHorizontalBlock"]:has([data-testid="stMetric"]) > [data-testid="column"] {
             width: 100% !important;
             flex: none !important;
         }
-        [data-testid="stMetricValue"] {
-            font-size: 1.4rem !important;
-        }
-        [data-testid="stMetricLabel"] {
-            font-size: 0.7rem !important;
-        }
     }
 
-    /* Tablet/medium: smaller text */
-    @media (max-width: 1000px) {
+    /* Breakpoint 2: 2-column layout (900-1200px) */
+    @media (max-width: 1200px) {
+        [data-testid="stHorizontalBlock"]:has([data-testid="stMetric"]) {
+            grid-template-columns: 1fr 1fr !important;
+        }
         [data-testid="stMetricValue"] {
-            font-size: 1.2rem !important;
+            font-size: 1.3rem !important;
         }
         [data-testid="stMetricLabel"] {
             font-size: 0.65rem !important;
         }
-        [data-testid="stMetric"] {
-            min-width: 100px !important;
-        }
     }
 
-    /* Mobile: even smaller */
-    @media (max-width: 600px) {
+    /* Breakpoint 3: Narrow tablet/large phone (600-900px) */
+    @media (max-width: 900px) {
         [data-testid="stMetricValue"] {
-            font-size: 1rem !important;
+            font-size: 1.1rem !important;
         }
         [data-testid="stMetricLabel"] {
             font-size: 0.6rem !important;
         }
         [data-testid="stMetric"] {
-            min-width: 80px !important;
+            min-width: 70px !important;
+        }
+    }
+
+    /* Breakpoint 4: Mobile (<600px) */
+    @media (max-width: 600px) {
+        [data-testid="stMetricValue"] {
+            font-size: 1rem !important;
+        }
+        [data-testid="stMetricLabel"] {
+            font-size: 0.55rem !important;
+        }
+        [data-testid="stMetric"] {
+            min-width: 60px !important;
         }
     }
 
@@ -241,13 +247,26 @@ st.markdown("""
         text-overflow: ellipsis;
         min-width: 0;
     }
-    /* Responsive header: smaller text on narrow screens */
+    /* Responsive header: progressively smaller on narrow screens */
+    @media (max-width: 900px) {
+        .dashboard-header h4 {
+            font-size: 1.1rem !important;
+        }
+    }
     @media (max-width: 600px) {
         .dashboard-header h4 {
-            font-size: 1rem !important;
+            font-size: 0.95rem !important;
         }
         .dashboard-header span {
-            font-size: 11px !important;
+            font-size: 10px !important;
+        }
+    }
+    @media (max-width: 400px) {
+        .dashboard-header h4 {
+            font-size: 0.85rem !important;
+        }
+        .dashboard-header span {
+            font-size: 9px !important;
         }
     }
 
