@@ -146,6 +146,33 @@ admin = "secure-password-here"
 
 ## Development
 
+### Streamlit CSS/HTML Learnings (December 2025)
+
+**Key insight**: Streamlit's component rendering wraps custom HTML in containers that can override CSS positioning. When styling custom elements:
+
+1. **Avoid overlay positioning** - `position: absolute`, `float`, negative margins, and `transform: translateX()` don't work reliably because Streamlit wraps elements in containers that reset positioning context.
+
+2. **Use single-line HTML strings** - Multi-line f-strings with `st.markdown(unsafe_allow_html=True)` can cause rendering issues (broken HTML, visible `</div>` tags). Always use single-line strings:
+   ```python
+   # ❌ Avoid - can break rendering
+   st.markdown(f'''
+       <div style="...">
+           <span>{text}</span>
+       </div>
+   ''', unsafe_allow_html=True)
+
+   # ✅ Better - single line
+   html = f'<div style="...">{legend_html}</div>'
+   st.markdown(html, unsafe_allow_html=True)
+   ```
+
+3. **Flow layout over overlay** - Instead of trying to float elements on top of the map, render them in normal document flow above/below the map.
+
+4. **Cache clearing** - Streamlit Cloud can cache CSS aggressively. If CSS changes don't appear:
+   - Rename CSS classes to force cache invalidation
+   - Use inline styles instead of CSS classes for critical positioning
+   - Increment version number in app.py to track deployments
+
 ### Adding New Filters
 
 1. Add filter UI in `components/sidebar_filters.py`
