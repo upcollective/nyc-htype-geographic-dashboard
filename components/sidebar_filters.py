@@ -74,13 +74,13 @@ def render_indicator_highlight(
     help_text: str = ""
 ) -> Optional[float]:
     """
-    Reusable indicator highlight component with checkbox + slider.
+    Compact indicator highlight component with checkbox + slider inline.
 
     This is a VISUAL control - it doesn't filter data, but marks schools
     that meet the threshold with a visual indicator (ring/border) on the map.
 
     Args:
-        label: Display label for the indicator
+        label: Display label for the indicator (include emoji)
         key_prefix: Unique key prefix for session state
         min_val: Minimum slider value
         max_val: Maximum slider value
@@ -91,10 +91,9 @@ def render_indicator_highlight(
     Returns:
         Threshold value as float (0-1) if enabled, None otherwise
     """
-    col1, col2 = st.columns([1, 3])
+    col1, col2, col3 = st.columns([1, 2, 2])
 
     with col1:
-        # Provide actual label for accessibility (hidden visually)
         enabled = st.checkbox(
             f"Enable {label} highlight",
             key=f"{key_prefix}_enabled",
@@ -102,6 +101,9 @@ def render_indicator_highlight(
         )
 
     with col2:
+        st.markdown(f"<span style='font-size:13px;'>{label}</span>", unsafe_allow_html=True)
+
+    with col3:
         if enabled:
             threshold = st.slider(
                 f"Highlight {label}",
@@ -113,10 +115,9 @@ def render_indicator_highlight(
                 key=f"{key_prefix}_slider",
                 label_visibility="collapsed"
             )
-            st.caption(f"🔴 Highlight {label} ≥ {threshold}%")
             return threshold / 100
         else:
-            st.caption(f"{label}")
+            st.caption("Off")
             return None
 
 
@@ -345,39 +346,32 @@ def render_sidebar_filters(filter_options: dict) -> dict:
                 selected_school_type = None
 
     # ════════════════════════════════════════════════════════════════════════════
-    # 4. INDICATOR HIGHLIGHTS (expander)
+    # 4. INDICATOR HIGHLIGHTS (expander) - Compact design
     # ════════════════════════════════════════════════════════════════════════════
     with st.sidebar.expander("📊 Indicator Highlights", expanded=False):
-        st.caption("Highlight high-need schools on map (visual only)")
+        st.caption("Highlight high-need schools on map")
 
-        # STH Indicator - visual highlight
-        st.markdown("**🏠 Students in Temp Housing (STH)**")
+        # STH Indicator - compact inline
         highlight_sth = render_indicator_highlight(
-            label="STH",
+            label="🏠 STH",
             key_prefix="sth",
             min_val=0,
             max_val=50,
             default_val=30,
             step=5,
-            help_text="Highlight schools with high housing instability"
+            help_text="Students in Temporary Housing"
         )
 
-        st.markdown("---")
-
-        # ENI Indicator - visual highlight
-        st.markdown("**💰 Economic Need Index (ENI)**")
+        # ENI Indicator - compact inline
         highlight_eni = render_indicator_highlight(
-            label="ENI",
+            label="💰 ENI",
             key_prefix="eni",
             min_val=50,
             max_val=100,
             default_val=85,
             step=5,
-            help_text="Highlight schools with high economic need"
+            help_text="Economic Need Index"
         )
-
-        st.markdown("---")
-        st.caption("*More indicators coming soon*")
 
     # ════════════════════════════════════════════════════════════════════════════
     # 5. MAP LAYERS (expander - ONLY shown on Map tab)
