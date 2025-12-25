@@ -51,11 +51,20 @@ st.set_page_config(
 # Custom CSS for compact, map-first design
 st.markdown("""
 <style>
-    /* Eliminate ALL top padding/margins */
+    /* Minimize padding for maximum map real estate */
     .block-container {
-        padding-top: 1rem !important;
+        padding-top: 0.5rem !important;
         padding-bottom: 0.5rem !important;
+        padding-left: 1rem !important;
+        padding-right: 1rem !important;
         max-width: 100% !important;
+    }
+
+    /* Make pydeck maps extend closer to edges */
+    [data-testid="stPydeckChart"] {
+        margin-left: -0.5rem !important;
+        margin-right: -0.5rem !important;
+        width: calc(100% + 1rem) !important;
     }
 
     /* Minimize Streamlit's default header but KEEP sidebar toggle visible */
@@ -344,7 +353,7 @@ def main():
         # Render map with view toggle (handles legend + map for both modes)
         render_map_with_view_toggle(
             filtered_df, layer_config, map_view, choropleth_layer,
-            highlight_config=highlight_config, height=700
+            highlight_config=highlight_config, height=750
         )
 
         # Minimal caption with context-aware info

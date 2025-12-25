@@ -43,6 +43,74 @@ NYC_BOUNDS = {
 # CartoDB Positron - free basemap, no API key required
 MAP_STYLE = "https://basemaps.cartocdn.com/gl/positron-gl-style/style.json"
 
+# Path to NYC mask GeoJSON (grey overlay for areas outside NYC)
+NYC_MASK_PATH = "data/geo/nyc_mask.geojson"
+
+
+def load_nyc_mask() -> Optional[dict]:
+    """
+    Load the NYC mask GeoJSON file.
+
+    The mask is an inverted polygon - a large rectangle covering the
+    viewable area with NYC cut out as a "hole". When rendered as a
+    semi-transparent grey layer, it effectively greys out everything
+    outside NYC while keeping NYC clear.
+
+    Returns:
+        GeoJSON dict or None if file not found
+    """
+    import json
+    from pathlib import Path
+
+    mask_path = Path(__file__).parent.parent / NYC_MASK_PATH
+
+    if not mask_path.exists():
+        return None
+
+    try:
+        with open(mask_path, 'r') as f:
+            return json.load(f)
+    except Exception as e:
+        st.warning(f"Could not load NYC mask: {e}")
+        return None
+
+
+def create_mask_layer(opacity: float = 0.6) -> Optional[pdk.Layer]:
+    """
+    Create a GeoJSON layer that masks (greys out) areas outside NYC.
+
+    This layer should be rendered BELOW school points and district
+    choropleth layers but ABOVE the basemap. It creates a professional
+    look by de-emphasizing New Jersey, Long Island, Westchester, etc.
+
+    Args:
+        opacity: Opacity of the grey mask (0.0-1.0). Default 0.6.
+
+    Returns:
+        Pydeck GeoJsonLayer or None if mask not available
+    """
+    mask_geojson = load_nyc_mask()
+
+    if mask_geojson is None:
+        return None
+
+    # Light grey color with configurable opacity
+    # RGB values create a neutral grey that works with Positron basemap
+    fill_color = [220, 220, 220, int(opacity * 255)]
+
+    return pdk.Layer(
+        "GeoJsonLayer",
+        data=mask_geojson,
+        get_fill_color=fill_color,
+        get_line_color=[180, 180, 180, 100],
+        line_width_min_pixels=0,
+        pickable=False,  # Not interactive
+        opacity=1.0,  # Opacity handled by fill_color alpha
+        stroked=False,
+        filled=True,
+        extruded=False,
+    )
+
 
 def calculate_view_state(df: pd.DataFrame, padding: float = 0.15) -> dict:
     """
@@ -424,12 +492,20 @@ def render_map(
             'zoom': zoom
         }
 
+    # Start with the mask layer (greys out areas outside NYC)
+    layers = []
+    mask_layer = create_mask_layer(opacity=0.55)
+    if mask_layer is not None:
+        layers.append(mask_layer)
+
     # Create the school layer
     school_layer = create_school_layer(df)
 
     if school_layer is None:
         st.warning("No schools with valid coordinates to display on map.")
         return
+
+    layers.append(school_layer)
 
     # Create the view state
     view_state = pdk.ViewState(
@@ -440,9 +516,9 @@ def render_map(
         bearing=0
     )
 
-    # Create the deck
+    # Create the deck with mask layer below schools
     deck = pdk.Deck(
-        layers=[school_layer],
+        layers=layers,
         initial_view_state=view_state,
         tooltip=create_tooltip(),
         map_style=MAP_STYLE,
@@ -573,17 +649,26 @@ def render_map_with_layers(
     # This ensures the map frames the data efficiently (zooms to Brooklyn when Brooklyn is filtered, etc.)
     view_config = calculate_view_state(df)
 
+    # Start with the mask layer (greys out areas outside NYC)
+    # This layer renders at the bottom, below school points
+    layers = []
+    mask_layer = create_mask_layer(opacity=0.55)
+    if mask_layer is not None:
+        layers.append(mask_layer)
+
     # Create all enabled training layers with indicator highlights
-    layers = create_training_layers(df, layer_config, highlight_config=highlight_config)
+    training_layers = create_training_layers(df, layer_config, highlight_config=highlight_config)
 
     # If no training layers (e.g., viewing untrained schools), show neutral layer
-    if len(layers) == 0:
+    if len(training_layers) == 0:
         neutral_layer = create_neutral_layer(df, highlight_config)
         if neutral_layer is not None:
-            layers = [neutral_layer]
-        else:
+            layers.append(neutral_layer)
+        elif len(layers) == 0:
             st.warning("No schools with valid coordinates to display.")
             return
+    else:
+        layers.extend(training_layers)
 
     # Create the view state using dynamically calculated bounds
     view_state = pdk.ViewState(
@@ -835,12 +920,20 @@ def render_choropleth_map(
     # Calculate dynamic view state based on filtered data bounds
     view_config = calculate_view_state(df)
 
+    # Start with the mask layer (greys out areas outside NYC)
+    layers = []
+    mask_layer = create_mask_layer(opacity=0.55)
+    if mask_layer is not None:
+        layers.append(mask_layer)
+
     # Create choropleth layer with filter settings
     choropleth_layer = create_choropleth_layer(df, layer_type, layer_filter_config)
 
     if choropleth_layer is None:
         st.warning("District boundaries not available. Please ensure nyc_school_districts.geojson is in data/geo/")
         return
+
+    layers.append(choropleth_layer)
 
     # Create view state using dynamically calculated bounds
     view_state = pdk.ViewState(
@@ -851,9 +944,9 @@ def render_choropleth_map(
         bearing=0
     )
 
-    # Create deck
+    # Create deck with mask layer below choropleth
     deck = pdk.Deck(
-        layers=[choropleth_layer],
+        layers=layers,
         initial_view_state=view_state,
         tooltip=create_choropleth_tooltip(),
         map_style=MAP_STYLE,
