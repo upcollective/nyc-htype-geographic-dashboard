@@ -1,6 +1,6 @@
 """
 HTYPE Geographic Intelligence Dashboard
-Version: 2025-12-25-v15-thin-info-strip
+Version: 2025-12-25-v16-responsive-tablet-fix
 
 An interactive visualization tool for NYC schools showing:
 - Human trafficking prevention education (HTYPE) training coverage
@@ -98,6 +98,29 @@ st.markdown("""
     }
     [data-testid="stMetric"] {
         padding: 0.15rem 0 !important;
+    }
+
+    /* Tablet responsive: Force 2-column grid for metrics on medium screens */
+    /* This prevents text truncation like "Total...", "LIGH..." at medium widths */
+    @media (min-width: 769px) and (max-width: 1100px) {
+        /* Target horizontal blocks containing metrics - force 2x2 grid */
+        [data-testid="stHorizontalBlock"]:has([data-testid="stMetric"]) {
+            display: grid !important;
+            grid-template-columns: 1fr 1fr !important;
+            gap: 0.75rem !important;
+        }
+        /* Ensure each column fills its grid cell */
+        [data-testid="stHorizontalBlock"]:has([data-testid="stMetric"]) > [data-testid="column"] {
+            width: 100% !important;
+            flex: none !important;
+        }
+        /* Slightly smaller metrics on tablet for better fit */
+        [data-testid="stMetricValue"] {
+            font-size: 1.3rem !important;
+        }
+        [data-testid="stMetricLabel"] {
+            font-size: 0.65rem !important;
+        }
     }
 
     /* Mobile responsive: Force 2-column grid for metrics on small screens */
