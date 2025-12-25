@@ -147,8 +147,6 @@ def render_training_layer_controls(training_status: str = 'All Schools') -> Dict
         return result
 
     # === TRAINING LAYERS ===
-    st.caption("Training Layers")
-
     fund_default = True
     lights_default = training_status not in ['🎯 Need LIGHTS']
 
@@ -156,14 +154,15 @@ def render_training_layer_controls(training_status: str = 'All Schools') -> Dict
     fund_enabled = st.checkbox(
         "🔵 Fundamentals",
         value=fund_default,
-        key="layer_fundamentals"
+        key="layer_fundamentals",
+        help="Show schools with Fundamentals training"
     )
     if fund_enabled:
         fund_min_depth = st.slider(
-            "Min trained staff",
+            "Min ≥",
             min_value=0, max_value=30, value=0, step=5,
             key="fund_min_depth",
-            help="Only show schools with at least this many trained"
+            format="%d staff"
         )
     else:
         fund_min_depth = 0
@@ -173,14 +172,15 @@ def render_training_layer_controls(training_status: str = 'All Schools') -> Dict
     lights_enabled = st.checkbox(
         "🟣 LIGHTS ToT",
         value=lights_default,
-        key="layer_lights"
+        key="layer_lights",
+        help="Show schools with LIGHTS trainers"
     )
     if lights_enabled:
         lights_min_depth = st.slider(
-            "Min trainers",
+            "Min ≥",
             min_value=0, max_value=15, value=0, step=1,
             key="lights_min_depth",
-            help="Only show schools with at least this many trainers"
+            format="%d trainers"
         )
     else:
         lights_min_depth = 0
@@ -192,9 +192,8 @@ def render_training_layer_controls(training_status: str = 'All Schools') -> Dict
         value=False,
         key="layer_students",
         disabled=True,
-        help="Coming soon - student session tracking"
+        help="Coming soon"
     )
-    st.caption("↳ Coming soon")
     result['student_sessions'] = {'enabled': False, 'placeholder': True}
 
     return result
