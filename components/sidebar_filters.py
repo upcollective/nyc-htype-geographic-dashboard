@@ -242,27 +242,30 @@ def render_sidebar_filters(df: pd.DataFrame) -> dict:
         st.session_state['_clear_filters_requested'] = False
 
     # ════════════════════════════════════════════════════════════════════════════
-    # 1. SEARCH + QUICK FILTERS
+    # 1. SEARCH + QUICK FILTERS (with Clear All in header)
     # ════════════════════════════════════════════════════════════════════════════
-    st.sidebar.markdown("### 🔍 Search & Filter")
+    # Header row: Title on left, Clear All on right
+    header_col1, header_col2 = st.sidebar.columns([3, 1])
+    with header_col1:
+        st.markdown("### 🔍 Filters")
+    with header_col2:
+        clear_filters = st.button("✕", key="qf_clear", help="Clear all filters")
 
     # Search box
     search_query = st.sidebar.text_input(
         "Search Schools",
         placeholder="Enter school name or DBN...",
         help="Search by school name or DBN code",
-        key="filter_search"
+        key="filter_search",
+        label_visibility="collapsed"
     )
 
-    # Quick Filter Buttons - 2 columns with clear as small text link
+    # Quick Filter Buttons - full width 2-column layout
     col1, col2 = st.sidebar.columns(2)
     with col1:
         no_training = st.button("No Training", use_container_width=True, key="qf_no_training")
     with col2:
         priority_btn = st.button("⚠️ Priority", use_container_width=True, type="primary", key="qf_priority")
-
-    # Clear as small text button (CSS in app.py handles spacing)
-    clear_filters = st.sidebar.button("✕ Clear filters", key="qf_clear", type="tertiary")
 
     # ════════════════════════════════════════════════════════════════════════════
     # 2. ANALYSIS MODE (after quick filters, outside expander)

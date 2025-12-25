@@ -1,6 +1,6 @@
 """
 HTYPE Geographic Intelligence Dashboard
-Version: 2025-12-25-v4-fix-spacing
+Version: 2025-12-25-v5-clear-in-header
 
 An interactive visualization tool for NYC schools showing:
 - Human trafficking prevention education (HTYPE) training coverage
@@ -205,12 +205,24 @@ st.markdown("""
         padding: 0 !important;
     }
 
-    /* Compact sidebar tertiary buttons (Clear filters) - reduce excessive spacing */
-    [data-testid="stSidebar"] button[kind="tertiary"] {
-        margin-top: -0.5rem !important;
-        margin-bottom: -1.5rem !important;
-        padding-top: 0.25rem !important;
-        padding-bottom: 0.25rem !important;
+    /* Compact sidebar header row (Filters title + X button) */
+    [data-testid="stSidebar"] [data-testid="stHorizontalBlock"]:first-of-type {
+        align-items: center !important;
+        margin-bottom: -0.5rem !important;
+    }
+    /* Make the X clear button smaller and subtle */
+    [data-testid="stSidebar"] [data-testid="stHorizontalBlock"]:first-of-type button {
+        padding: 0.15rem 0.5rem !important;
+        font-size: 0.8rem !important;
+        min-height: 0 !important;
+        height: auto !important;
+        background: transparent !important;
+        border: 1px solid #ddd !important;
+        color: #666 !important;
+    }
+    [data-testid="stSidebar"] [data-testid="stHorizontalBlock"]:first-of-type button:hover {
+        background: #f0f0f0 !important;
+        border-color: #ccc !important;
     }
 </style>
 """, unsafe_allow_html=True)
