@@ -1,6 +1,6 @@
 """
 HTYPE Geographic Intelligence Dashboard
-Version: 2025-12-25-v20-3col-breakpoint
+Version: 2025-12-25-v21-responsive-html-grid
 
 An interactive visualization tool for NYC schools showing:
 - Human trafficking prevention education (HTYPE) training coverage
