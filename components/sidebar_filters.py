@@ -74,10 +74,12 @@ def render_indicator_highlight(
     help_text: str = ""
 ) -> Optional[float]:
     """
-    Compact indicator highlight component with checkbox + slider inline.
+    Indicator highlight component with checkbox and conditional slider.
 
     This is a VISUAL control - it doesn't filter data, but marks schools
     that meet the threshold with a visual indicator (ring/border) on the map.
+
+    Uses simple stacked layout that works reliably in narrow sidebar.
 
     Args:
         label: Display label for the indicator (include emoji)
@@ -91,115 +93,108 @@ def render_indicator_highlight(
     Returns:
         Threshold value as float (0-1) if enabled, None otherwise
     """
-    col1, col2, col3 = st.columns([1, 2, 2])
+    enabled = st.checkbox(
+        label,
+        key=f"{key_prefix}_enabled",
+        help=help_text
+    )
 
-    with col1:
-        enabled = st.checkbox(
-            f"Enable {label} highlight",
-            key=f"{key_prefix}_enabled",
-            label_visibility="collapsed"
+    if enabled:
+        threshold = st.slider(
+            f"Threshold ≥",
+            min_value=min_val,
+            max_value=max_val,
+            value=default_val,
+            step=step,
+            key=f"{key_prefix}_slider",
+            format="%d%%"
         )
-
-    with col2:
-        st.markdown(f"<span style='font-size:13px;'>{label}</span>", unsafe_allow_html=True)
-
-    with col3:
-        if enabled:
-            threshold = st.slider(
-                f"Highlight {label}",
-                min_value=min_val,
-                max_value=max_val,
-                value=default_val,
-                step=step,
-                help=help_text,
-                key=f"{key_prefix}_slider",
-                label_visibility="collapsed"
-            )
-            return threshold / 100
-        else:
-            st.caption("Off")
-            return None
+        return threshold / 100
+    else:
+        return None
 
 
 def render_training_layer_controls(training_status: str = 'All Schools') -> Dict:
     """
-    Compact map layer controls with view toggle and training type visibility.
+    Map layer controls with view toggle and training type visibility.
+
+    Uses simple checkbox+label layout that works reliably in narrow sidebar.
 
     Returns:
         Dict with 'map_view' ('schools' or 'districts') and layer configs
     """
     result = {}
 
-    # === VIEW MODE (top, separated) ===
-    col1, col2 = st.columns([1, 4])
-    with col1:
-        show_districts = st.checkbox(
-            "District view",
-            value=st.session_state.get('map_view_mode', False),
-            key="map_view_mode",
-            label_visibility="collapsed"
-        )
-    with col2:
-        view_label = "📊 Districts" if show_districts else "📍 Schools"
-        st.markdown(f"<span style='font-size:13px;'>{view_label}</span>", unsafe_allow_html=True)
-
+    # === VIEW MODE TOGGLE (top) ===
+    show_districts = st.toggle(
+        "📊 District View",
+        value=st.session_state.get('map_view_mode', False),
+        key="map_view_mode",
+        help="Toggle between school points and district choropleth"
+    )
     result['map_view'] = 'districts' if show_districts else 'schools'
 
-    st.caption("─" * 20)  # Visual separator
+    st.divider()  # Visual separator
 
     # Determine layer availability based on analysis mode
     layers_disabled = training_status == '🎯 Need Fundamentals'
 
     if layers_disabled:
-        st.caption("ℹ️ Untrained schools (gray)")
+        st.caption("ℹ️ Showing untrained schools only")
         result['fundamentals'] = {'enabled': False, 'min_depth': 0}
         result['lights'] = {'enabled': False, 'min_depth': 0}
         result['student_sessions'] = {'enabled': False, 'placeholder': True}
         return result
 
-    # === TRAINING LAYERS (compact inline) ===
+    # === TRAINING LAYERS ===
+    st.caption("Training Layers")
+
     fund_default = True
     lights_default = training_status not in ['🎯 Need LIGHTS']
 
     # Fundamentals
-    col1, col2, col3 = st.columns([1, 2, 2])
-    with col1:
-        fund_enabled = st.checkbox("Fund", value=fund_default, key="layer_fundamentals", label_visibility="collapsed")
-    with col2:
-        color_hex = get_layer_hex_color('fundamentals')
-        st.markdown(f"<span style='color:{color_hex};font-size:13px;'>🔵 Fundamentals</span>", unsafe_allow_html=True)
-    with col3:
-        if fund_enabled:
-            fund_min_depth = st.slider("Min", 0, 30, 0, 5, key="fund_min_depth", label_visibility="collapsed")
-        else:
-            st.caption("Off")
-            fund_min_depth = 0
+    fund_enabled = st.checkbox(
+        "🔵 Fundamentals",
+        value=fund_default,
+        key="layer_fundamentals"
+    )
+    if fund_enabled:
+        fund_min_depth = st.slider(
+            "Min trained staff",
+            min_value=0, max_value=30, value=0, step=5,
+            key="fund_min_depth",
+            help="Only show schools with at least this many trained"
+        )
+    else:
+        fund_min_depth = 0
     result['fundamentals'] = {'enabled': fund_enabled, 'min_depth': fund_min_depth}
 
     # LIGHTS
-    col1, col2, col3 = st.columns([1, 2, 2])
-    with col1:
-        lights_enabled = st.checkbox("LIGHTS", value=lights_default, key="layer_lights", label_visibility="collapsed")
-    with col2:
-        color_hex = get_layer_hex_color('lights')
-        st.markdown(f"<span style='color:{color_hex};font-size:13px;'>🟣 LIGHTS ToT</span>", unsafe_allow_html=True)
-    with col3:
-        if lights_enabled:
-            lights_min_depth = st.slider("Min", 0, 15, 0, 1, key="lights_min_depth", label_visibility="collapsed")
-        else:
-            st.caption("Off")
-            lights_min_depth = 0
+    lights_enabled = st.checkbox(
+        "🟣 LIGHTS ToT",
+        value=lights_default,
+        key="layer_lights"
+    )
+    if lights_enabled:
+        lights_min_depth = st.slider(
+            "Min trainers",
+            min_value=0, max_value=15, value=0, step=1,
+            key="lights_min_depth",
+            help="Only show schools with at least this many trainers"
+        )
+    else:
+        lights_min_depth = 0
     result['lights'] = {'enabled': lights_enabled, 'min_depth': lights_min_depth}
 
-    # Student Sessions (placeholder)
-    col1, col2, col3 = st.columns([1, 2, 2])
-    with col1:
-        st.checkbox("Students", value=False, key="layer_students", disabled=True, label_visibility="collapsed")
-    with col2:
-        color_hex = get_layer_hex_color('student_sessions')
-        st.markdown(f"<span style='color:{color_hex};font-size:13px;'>🟢 Students</span>", unsafe_allow_html=True)
-    with col3:
-        st.caption("Soon")
+    # Student Sessions (placeholder - disabled)
+    st.checkbox(
+        "🟢 Students",
+        value=False,
+        key="layer_students",
+        disabled=True,
+        help="Coming soon - student session tracking"
+    )
+    st.caption("↳ Coming soon")
     result['student_sessions'] = {'enabled': False, 'placeholder': True}
 
     return result
