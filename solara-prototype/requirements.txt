@@ -10,6 +10,7 @@ numpy>=1.24.0
 
 # Mapping (ipyleaflet for native Jupyter/Solara integration)
 ipyleaflet>=0.18.0
+ipywidgets>=8.0.0  # Required for widget rendering in Docker
 branca>=0.6.0  # Colormaps for choropleth
 
 # Google Sheets integration (live data)

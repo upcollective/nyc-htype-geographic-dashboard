@@ -32,6 +32,14 @@ import reacton.ipyvuetify as rv
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
+# Startup diagnostic
+logger.info("=" * 50)
+logger.info("HTYPE Geographic Dashboard starting up...")
+logger.info(f"Python executing from: {__file__}")
+import os
+logger.info(f"GOOGLE_CREDENTIALS_JSON set: {'Yes' if os.environ.get('GOOGLE_CREDENTIALS_JSON') else 'No'}")
+logger.info("=" * 50)
+
 # Try to import utils for live data (may fail if dependencies not installed)
 try:
     from utils import (
