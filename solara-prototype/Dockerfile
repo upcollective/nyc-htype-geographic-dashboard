@@ -1,7 +1,6 @@
-# Hugging Face Spaces - Solara Dashboard
-# HTYPE Geographic Intelligence Dashboard
-#
+# Solara Dashboard - HTYPE Geographic Intelligence
 # Uses jupyter/base-notebook for proper ipywidgets/ipyleaflet support
+# Compatible with Render.com, HF Spaces, and other Docker hosts
 
 FROM jupyter/base-notebook:latest
 
@@ -26,8 +25,9 @@ RUN chown -R ${NB_UID}:${NB_GID} /app
 # Switch back to notebook user
 USER ${NB_USER}
 
-# Expose port 8765 (Solara default)
+# Default port (can be overridden by PORT env var)
+ENV PORT=8765
 EXPOSE 8765
 
-# Run Solara on port 8765
-CMD ["solara", "run", "app.py", "--host", "0.0.0.0", "--port", "8765"]
+# Run Solara - uses PORT env var for flexibility across platforms
+CMD solara run app.py --host 0.0.0.0 --port ${PORT}

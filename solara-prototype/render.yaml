@@ -1,0 +1,12 @@
+# Render.com deployment configuration
+# https://render.com/docs/blueprint-spec
+
+services:
+  - type: web
+    name: htype-geographic-dashboard
+    runtime: docker
+    plan: free
+    healthCheckPath: /
+    envVars:
+      - key: GOOGLE_CREDENTIALS_JSON
+        sync: false  # Set manually in Render dashboard
