@@ -119,6 +119,28 @@ def load_school_data() -> pd.DataFrame:
     # Fallback to mock CSV
     logger.info("Loading mock data from CSV...")
     data_path = Path(__file__).parent / "data" / "mock_schools.csv"
+
+    if not data_path.exists():
+        # Create minimal fallback data so the app can at least load
+        logger.error(f"Mock data file not found: {data_path}")
+        logger.error("Creating minimal fallback data - dashboard will have limited functionality")
+        df = pd.DataFrame({
+            'school_dbn': ['00X000'],
+            'school_name': ['Data Loading Error - Check Credentials'],
+            'borough': ['UNKNOWN'],
+            'district': [0],
+            'latitude': [40.7128],
+            'longitude': [-74.0060],
+            'training_status': ['No Training'],
+            'color': ['#B87D7D'],
+            'eni_score': [0],
+            'sth_pct': [0],
+            'superintendent': ['Check GOOGLE_CREDENTIALS_JSON env var'],
+        })
+        _cached_data = df
+        _data_source = "error"
+        return df.copy()
+
     df = pd.read_csv(data_path)
 
     # Add any missing columns expected by the app

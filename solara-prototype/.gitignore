@@ -27,3 +27,6 @@ venv/
 
 # Ploomber
 ploomber-cloud.json
+
+# Allow mock data for deployment fallback (override parent gitignore)
+!data/mock_schools.csv

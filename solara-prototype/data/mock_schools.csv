@@ -1,0 +1,96 @@
+school_dbn,school_name,borough,district,latitude,longitude,training_status,color,eni_score,sth_pct,superintendent
+01M015,P.S. 015 Roberto Clemente,MANHATTAN,1,40.7185,-73.9838,Complete,#6B9080,0.82,12.5,Maria Rodriguez
+01M019,P.S. 019 Asher Levy,MANHATTAN,1,40.7165,-73.9823,Complete,#6B9080,0.75,8.2,Maria Rodriguez
+01M020,P.S. 020 Anna Silver,MANHATTAN,1,40.7189,-73.9779,Fundamentals Only,#D4A574,0.88,18.3,Maria Rodriguez
+01M034,P.S. 034 Franklin D. Roosevelt,MANHATTAN,1,40.7148,-73.9801,No Training,#B87D7D,0.91,22.5,Maria Rodriguez
+01M063,The STAR Academy,MANHATTAN,1,40.7221,-73.9833,Complete,#6B9080,0.68,5.1,Maria Rodriguez
+01M064,P.S. 064 Robert Simon,MANHATTAN,1,40.7209,-73.9855,No Training,#B87D7D,0.87,15.8,Maria Rodriguez
+01M110,P.S. 110 Florence Nightingale,MANHATTAN,1,40.7142,-73.9859,Fundamentals Only,#D4A574,0.79,9.4,Maria Rodriguez
+01M134,P.S. 134 Henrietta Szold,MANHATTAN,1,40.7156,-73.9776,Complete,#6B9080,0.72,6.3,Maria Rodriguez
+01M140,P.S. 140 Nathan Straus,MANHATTAN,1,40.7173,-73.9852,No Training,#B87D7D,0.93,28.6,Maria Rodriguez
+01M184,P.S. 184 Shuang Wen,MANHATTAN,1,40.7129,-73.9827,Complete,#6B9080,0.65,4.2,Maria Rodriguez
+02M033,P.S. 033 Chelsea Prep,MANHATTAN,2,40.7481,-73.9998,Complete,#6B9080,0.58,3.1,James Chen
+02M041,P.S. 041 Greenwich Village,MANHATTAN,2,40.7285,-74.0011,Fundamentals Only,#D4A574,0.45,1.8,James Chen
+02M047,P.S. 047 Allerton Avenue,MANHATTAN,2,40.7302,-73.9945,No Training,#B87D7D,0.62,7.5,James Chen
+02M051,P.S. 051 Elias Howe,MANHATTAN,2,40.7519,-73.9872,Complete,#6B9080,0.51,2.4,James Chen
+02M059,P.S. 059 Beekman Hill International,MANHATTAN,2,40.7548,-73.9667,Complete,#6B9080,0.38,0.9,James Chen
+02M116,P.S. 116 Mary Lindley Murray,MANHATTAN,2,40.7470,-73.9725,No Training,#B87D7D,0.89,19.2,James Chen
+02M126,P.S. 126 Jacob August Riis,MANHATTAN,2,40.7195,-73.9912,Fundamentals Only,#D4A574,0.84,14.6,James Chen
+02M158,P.S. 158 Bayard Taylor,MANHATTAN,2,40.7298,-73.9845,Complete,#6B9080,0.71,8.1,James Chen
+02M183,P.S. 183 Robert L. Stevenson,MANHATTAN,2,40.7757,-73.9517,No Training,#B87D7D,0.56,4.3,James Chen
+02M198,P.S. 198 Isador E. Ida Straus,MANHATTAN,2,40.7845,-73.9532,Complete,#6B9080,0.42,1.5,James Chen
+03M009,P.S. 009 Sarah Anderson,MANHATTAN,3,40.7912,-73.9723,Fundamentals Only,#D4A574,0.67,6.8,Patricia Williams
+03M084,P.S. 084 Lillian Weber,MANHATTAN,3,40.7985,-73.9658,Complete,#6B9080,0.54,3.2,Patricia Williams
+03M145,P.S. 145 Bloomingdale,MANHATTAN,3,40.7935,-73.9735,No Training,#B87D7D,0.86,16.4,Patricia Williams
+03M163,P.S. 163 Alfred E. Smith,MANHATTAN,3,40.8015,-73.9685,Complete,#6B9080,0.61,5.5,Patricia Williams
+03M165,P.S. 165 Robert E. Simon,MANHATTAN,3,40.7972,-73.9702,Fundamentals Only,#D4A574,0.73,9.1,Patricia Williams
+13K011,P.S. 011 Purvis J. Behan,BROOKLYN,13,40.6915,-73.9845,Complete,#6B9080,0.78,11.2,Sandra Lee
+13K020,P.S. 020 Clinton Hill,BROOKLYN,13,40.6892,-73.9668,No Training,#B87D7D,0.92,24.8,Sandra Lee
+13K044,P.S. 044 Marcus Garvey,BROOKLYN,13,40.6845,-73.9612,Complete,#6B9080,0.69,7.4,Sandra Lee
+13K056,P.S. 056 Lewis H. Latimer,BROOKLYN,13,40.6878,-73.9545,Fundamentals Only,#D4A574,0.85,17.2,Sandra Lee
+13K067,P.S. 067 Charles A. Dorsey,BROOKLYN,13,40.6925,-73.9702,No Training,#B87D7D,0.88,20.1,Sandra Lee
+14K071,P.S. 071 Forest,BROOKLYN,14,40.7089,-73.9456,Complete,#6B9080,0.76,10.5,David Park
+14K132,P.S. 132 The Conselyea School,BROOKLYN,14,40.7152,-73.9412,Fundamentals Only,#D4A574,0.81,13.8,David Park
+14K147,P.S. 147 Isaac Remsen,BROOKLYN,14,40.7058,-73.9523,No Training,#B87D7D,0.94,31.2,David Park
+14K157,P.S. 157 Benjamin Franklin,BROOKLYN,14,40.7112,-73.9389,Complete,#6B9080,0.63,4.9,David Park
+14K250,P.S. 250 George H. Lindsay,BROOKLYN,14,40.7045,-73.9478,Complete,#6B9080,0.59,3.7,David Park
+15K001,P.S. 001 The Bergen,BROOKLYN,15,40.6789,-73.9923,Fundamentals Only,#D4A574,0.74,8.6,Jennifer Martinez
+15K015,P.S. 015 Patrick F. Daly,BROOKLYN,15,40.6752,-73.9856,Complete,#6B9080,0.82,12.3,Jennifer Martinez
+15K029,P.S. 029 John M. Harrigan,BROOKLYN,15,40.6812,-73.9989,No Training,#B87D7D,0.90,21.4,Jennifer Martinez
+15K032,P.S. 032 Samuel Mills Sprole,BROOKLYN,15,40.6745,-74.0012,Complete,#6B9080,0.55,2.8,Jennifer Martinez
+15K038,P.S. 038 The Pacific,BROOKLYN,15,40.6825,-73.9945,Fundamentals Only,#D4A574,0.77,10.9,Jennifer Martinez
+07X002,P.S. 002 Morrisania,BRONX,7,40.8245,-73.9023,Complete,#6B9080,0.89,18.7,Robert Johnson
+07X027,P.S. 027 Hunts Point,BRONX,7,40.8198,-73.8912,No Training,#B87D7D,0.96,35.2,Robert Johnson
+07X028,P.S. 028 Mount Hope,BRONX,7,40.8289,-73.8978,Fundamentals Only,#D4A574,0.91,25.6,Robert Johnson
+07X035,P.S. 035 Franz Sigel,BRONX,7,40.8315,-73.9045,Complete,#6B9080,0.84,15.3,Robert Johnson
+07X048,P.S. 048 Joseph R. Drake,BRONX,7,40.8156,-73.8856,No Training,#B87D7D,0.93,29.8,Robert Johnson
+08X036,P.S. 036 Unionport,BRONX,8,40.8312,-73.8612,Complete,#6B9080,0.78,11.8,Angela Davis
+08X048,P.S. 048 Joseph E. Drake,BRONX,8,40.8256,-73.8545,Fundamentals Only,#D4A574,0.86,16.9,Angela Davis
+08X069,P.S. 069 Journey Prep,BRONX,8,40.8389,-73.8623,No Training,#B87D7D,0.92,27.3,Angela Davis
+08X100,P.S. 100 Isaac Clason,BRONX,8,40.8345,-73.8589,Complete,#6B9080,0.71,7.8,Angela Davis
+08X138,P.S. 138 Samuel Randall,BRONX,8,40.8278,-73.8678,Complete,#6B9080,0.67,5.4,Angela Davis
+09X030,P.S. 030 Wilton,BRONX,9,40.8489,-73.8912,Fundamentals Only,#D4A574,0.83,14.2,Michael Brown
+09X035,P.S. 035 Franz Sigel,BRONX,9,40.8512,-73.8956,No Training,#B87D7D,0.95,32.1,Michael Brown
+09X053,P.S. 053 Basheer Quisim,BRONX,9,40.8445,-73.8878,Complete,#6B9080,0.79,12.6,Michael Brown
+09X055,P.S. 055 Benjamin Franklin,BRONX,9,40.8478,-73.8823,Complete,#6B9080,0.74,9.3,Michael Brown
+09X057,P.S. 057 Crescent,BRONX,9,40.8525,-73.8912,No Training,#B87D7D,0.88,19.5,Michael Brown
+24Q019,P.S. 019 Marino Jeantet,QUEENS,24,40.7289,-73.9056,Complete,#6B9080,0.72,8.4,Lisa Anderson
+24Q021,P.S. 021 Edward Hart,QUEENS,24,40.7245,-73.9112,Fundamentals Only,#D4A574,0.78,11.6,Lisa Anderson
+24Q058,P.S. 058 Maspeth,QUEENS,24,40.7312,-73.9023,No Training,#B87D7D,0.65,5.2,Lisa Anderson
+24Q068,P.S. 068 Middle Village,QUEENS,24,40.7189,-73.8856,Complete,#6B9080,0.58,3.4,Lisa Anderson
+24Q071,P.S. 071 Forest,QUEENS,24,40.7156,-73.8912,Complete,#6B9080,0.62,4.7,Lisa Anderson
+25Q020,P.S. 020 John Bowne,QUEENS,25,40.7612,-73.8289,Fundamentals Only,#D4A574,0.69,6.9,Thomas Garcia
+25Q021,P.S. 021 Edward Hart,QUEENS,25,40.7645,-73.8345,No Training,#B87D7D,0.86,17.8,Thomas Garcia
+25Q022,P.S. 022 Thomas Jefferson,QUEENS,25,40.7589,-73.8212,Complete,#6B9080,0.54,2.6,Thomas Garcia
+25Q024,P.S. 024 Andrew Jackson,QUEENS,25,40.7678,-73.8156,Complete,#6B9080,0.48,1.9,Thomas Garcia
+25Q025,P.S. 025 Cadwallader Colden,QUEENS,25,40.7545,-73.8278,No Training,#B87D7D,0.91,23.4,Thomas Garcia
+26Q029,P.S. 029 Queens,QUEENS,26,40.7456,-73.7912,Complete,#6B9080,0.43,1.2,Nancy Wilson
+26Q031,P.S. 031 Bayside,QUEENS,26,40.7523,-73.7845,Fundamentals Only,#D4A574,0.51,2.1,Nancy Wilson
+26Q032,P.S. 032 State Street,QUEENS,26,40.7389,-73.7978,No Training,#B87D7D,0.75,9.8,Nancy Wilson
+26Q046,P.S. 046 Alley Pond,QUEENS,26,40.7478,-73.7889,Complete,#6B9080,0.39,0.8,Nancy Wilson
+26Q159,P.S. 159 Bayside,QUEENS,26,40.7512,-73.7823,Complete,#6B9080,0.46,1.4,Nancy Wilson
+27Q019,P.S. 019 Woodhaven,QUEENS,27,40.6912,-73.8523,No Training,#B87D7D,0.87,18.2,Richard Moore
+27Q045,P.S. 045 Clarence Witherspoon,QUEENS,27,40.6845,-73.8612,Complete,#6B9080,0.76,10.4,Richard Moore
+27Q050,P.S. 050 Talfourd Lawn,QUEENS,27,40.6789,-73.8456,Fundamentals Only,#D4A574,0.82,13.5,Richard Moore
+27Q060,P.S. 060 Woodhaven,QUEENS,27,40.6923,-73.8489,Complete,#6B9080,0.68,6.2,Richard Moore
+27Q063,P.S. 063 Old South,QUEENS,27,40.6856,-73.8545,No Training,#B87D7D,0.89,20.7,Richard Moore
+31R004,P.S. 004 Maurice Wollin,STATEN ISLAND,31,40.6312,-74.1523,Complete,#6B9080,0.52,2.3,Elizabeth Jones
+31R011,P.S. 011 Thomas Dongan,STATEN ISLAND,31,40.6189,-74.1612,Fundamentals Only,#D4A574,0.64,5.6,Elizabeth Jones
+31R013,P.S. 013 M. L. Lindemeyer,STATEN ISLAND,31,40.6256,-74.1456,No Training,#B87D7D,0.85,16.1,Elizabeth Jones
+31R016,P.S. 016 John Randolph,STATEN ISLAND,31,40.6345,-74.1389,Complete,#6B9080,0.47,1.7,Elizabeth Jones
+31R018,P.S. 018 John G. Whittier,STATEN ISLAND,31,40.6178,-74.1545,Complete,#6B9080,0.41,0.9,Elizabeth Jones
+31R019,P.S. 019 Curtis,STATEN ISLAND,31,40.6289,-74.1478,No Training,#B87D7D,0.88,19.4,Elizabeth Jones
+31R020,P.S. 020 Port Richmond,STATEN ISLAND,31,40.6412,-74.1356,Fundamentals Only,#D4A574,0.73,8.7,Elizabeth Jones
+31R021,P.S. 021 Margaret Emery-Elm Park,STATEN ISLAND,31,40.6356,-74.1423,Complete,#6B9080,0.56,3.5,Elizabeth Jones
+31R022,P.S. 022 Graniteville,STATEN ISLAND,31,40.6223,-74.1589,No Training,#B87D7D,0.91,24.3,Elizabeth Jones
+31R023,P.S. 023 Richmondtown,STATEN ISLAND,31,40.6145,-74.1512,Complete,#6B9080,0.49,2.1,Elizabeth Jones
+17K006,P.S. 006 Kingsborough,BROOKLYN,17,40.6612,-73.9523,Fundamentals Only,#D4A574,0.79,11.3,Karen Thompson
+17K091,P.S. 091 Albany Ave,BROOKLYN,17,40.6545,-73.9612,Complete,#6B9080,0.72,7.6,Karen Thompson
+17K092,P.S. 092 Adrian Hegeman,BROOKLYN,17,40.6678,-73.9456,No Training,#B87D7D,0.93,26.8,Karen Thompson
+17K138,P.S. 138 Brooklyn,BROOKLYN,17,40.6589,-73.9545,Complete,#6B9080,0.66,5.8,Karen Thompson
+17K189,P.S. 189 Brooklyn,BROOKLYN,17,40.6712,-73.9389,Complete,#6B9080,0.61,4.2,Karen Thompson
+18K235,P.S. 235 Janice Marie Knight,BROOKLYN,18,40.6445,-73.9212,No Training,#B87D7D,0.94,30.5,William Taylor
+18K276,P.S. 276 Louis Marshall,BROOKLYN,18,40.6512,-73.9145,Fundamentals Only,#D4A574,0.87,17.9,William Taylor
+18K279,P.S. 279 Kingsboro,BROOKLYN,18,40.6378,-73.9278,Complete,#6B9080,0.75,9.6,William Taylor
+18K289,P.S. 289 George V. Brower,BROOKLYN,18,40.6489,-73.9189,Complete,#6B9080,0.69,6.4,William Taylor
+18K315,P.S. 315 Flatbush,BROOKLYN,18,40.6412,-73.9256,No Training,#B87D7D,0.90,22.1,William Taylor
