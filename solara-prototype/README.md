@@ -1,6 +1,18 @@
-# Solara Prototype - HTYPE Geographic Dashboard
+---
+title: HTYPE Geographic Dashboard
+emoji: 🗺️
+colorFrom: green
+colorTo: blue
+sdk: docker
+pinned: false
+license: mit
+---
 
-A Solara-based interactive dashboard for visualizing HTYPE training coverage across NYC schools.
+# HTYPE Geographic Intelligence Dashboard
+
+Interactive visualization of Human Trafficking Prevention Education (HTYPE) training coverage across NYC's 1,656 public schools.
+
+**Built with Solara + ipyleaflet** for responsive, component-level updates without full page re-renders.
 
 ## Quick Start
 
