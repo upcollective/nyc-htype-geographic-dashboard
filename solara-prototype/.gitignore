@@ -1,0 +1,29 @@
+# Credentials - NEVER commit
+.credentials/
+service-account*.json
+*credentials*.json
+*.pem
+*.key
+
+# Environment
+.env
+.env.local
+.env.*.local
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+.venv/
+venv/
+
+# IDE
+.idea/
+.vscode/
+*.swp
+
+# OS
+.DS_Store
+
+# Ploomber
+ploomber-cloud.json
