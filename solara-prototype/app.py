@@ -6041,6 +6041,19 @@ def Page():
     # Global styles
     solara.HTML(unsafe_innerHTML=GLOBAL_CSS)
 
+    # Open Graph meta tags for URL preview when sharing
+    # Image hosted on GitHub raw for reliable access
+    OG_IMAGE_URL = "https://raw.githubusercontent.com/upcollective/nyc-htype-geographic-dashboard/solara-stable/solara-prototype/assets/og-preview.png"
+    solara.Meta(property="og:title", content="HTYPE Dashboard - NYC Schools")
+    solara.Meta(property="og:description", content="Human Trafficking Prevention Education training coverage across 1,647 NYC schools. Geographic analysis and compliance tracking.")
+    solara.Meta(property="og:image", content=OG_IMAGE_URL)
+    solara.Meta(property="og:url", content="https://htype-geographic-dashboard-386102540093.us-east1.run.app")
+    solara.Meta(property="og:type", content="website")
+    solara.Meta(name="twitter:card", content="summary_large_image")
+    solara.Meta(name="twitter:title", content="HTYPE Dashboard - NYC Schools")
+    solara.Meta(name="twitter:description", content="Human Trafficking Prevention Education training coverage across 1,647 NYC schools.")
+    solara.Meta(name="twitter:image", content=OG_IMAGE_URL)
+
     # Get unique superintendent list from data
     superintendent_options = ["All Superintendents"]
     if 'superintendent' in df_raw.columns:
