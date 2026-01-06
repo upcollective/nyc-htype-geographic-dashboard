@@ -38,7 +38,15 @@ logger.info("HTYPE Geographic Dashboard starting up...")
 logger.info(f"Python executing from: {__file__}")
 import os
 logger.info(f"GOOGLE_CREDENTIALS_JSON set: {'Yes' if os.environ.get('GOOGLE_CREDENTIALS_JSON') else 'No'}")
+logger.info(f"DASHBOARD_PASSWORD set: {'Yes' if os.environ.get('DASHBOARD_PASSWORD') else 'No (public access)'}")
 logger.info("=" * 50)
+
+# ============================================================================
+# AUTHENTICATION
+# ============================================================================
+# Password is stored in environment variable DASHBOARD_PASSWORD
+# If not set, dashboard is publicly accessible (for development)
+DASHBOARD_PASSWORD = os.environ.get('DASHBOARD_PASSWORD', '')
 
 # Try to import utils for live data (may fail if dependencies not installed)
 try:
@@ -275,6 +283,26 @@ def get_stats(df: pd.DataFrame) -> dict:
     has_lights_count = len(df[df.get('has_lights', pd.Series(['No'] * total)) == 'Yes']) if 'has_lights' in df.columns else 0
     has_students_count = 0  # Placeholder - student sessions not yet tracked
 
+    # Trained count: schools with ANY training (Fundamentals OR LIGHTS)
+    # Note: These overlap, so we use OR logic to avoid double-counting
+    has_any_training = pd.Series([False] * len(df), index=df.index)
+    if 'has_fundamentals' in df.columns:
+        has_any_training |= (df['has_fundamentals'] == 'Yes')
+    if 'has_lights' in df.columns:
+        has_any_training |= (df['has_lights'] == 'Yes')
+    trained_count = int(has_any_training.sum())
+
+    # Training gap metrics for comprehensive overview
+    # Schools that need LIGHTS: have Fundamentals but NOT LIGHTS
+    need_lights_count = 0
+    if 'has_fundamentals' in df.columns and 'has_lights' in df.columns:
+        need_lights_mask = (df['has_fundamentals'] == 'Yes') & (df['has_lights'] != 'Yes')
+        need_lights_count = int(need_lights_mask.sum())
+
+    # Schools with LIGHTS awaiting student sessions (all LIGHTS schools until tracking implemented)
+    # This shows schools with LIGHTS trainers who could be delivering sessions
+    awaiting_sessions_count = has_lights_count  # Currently all LIGHTS schools
+
     # New metrics using ENI/STH columns
     # STH ≥15% puts school in top ~30% for housing instability
     # ENI ≥74% is DOE's own "skewed toward lower incomes" cutoff
@@ -321,6 +349,12 @@ def get_stats(df: pd.DataFrame) -> dict:
         'has_fund_pct': round(has_fund_count / total * 100, 1) if total > 0 else 0,
         'has_lights_pct': round(has_lights_count / total * 100, 1) if total > 0 else 0,
         'has_students_pct': round(has_students_count / total * 100, 1) if total > 0 else 0,
+        # Aggregate trained count (schools with ANY training)
+        'trained_count': trained_count,
+        'trained_pct': round(trained_count / total * 100, 1) if total > 0 else 0,
+        # Training gap metrics (for comprehensive overview)
+        'need_lights_count': need_lights_count,  # Have Fundamentals but not LIGHTS
+        'awaiting_sessions_count': awaiting_sessions_count,  # Have LIGHTS, awaiting student sessions
         # Vulnerability metrics
         'priority': priority,
         'high_eni': high_eni,
@@ -784,6 +818,7 @@ def prepare_choropleth_geojson(df: pd.DataFrame, geojson: dict) -> dict:
 
 GLOBAL_CSS = """
 <style>
+    /* ===== MOBILE-FIRST BASE STYLES ===== */
     html, body {
         margin: 0;
         padding: 0;
@@ -796,6 +831,35 @@ GLOBAL_CSS = """
     }
     .v-application--wrap {
         min-height: 100vh !important;
+        /* Modern viewport units for mobile Safari address bar */
+        min-height: 100dvh !important;
+    }
+
+    /* ===== MAIN APP CONTAINER - MOBILE FIX ===== */
+    /* Ensure the main Column container respects flexbox */
+    .v-application .container {
+        max-width: 100% !important;
+        padding: 0 !important;
+    }
+
+    /* Target Solara's main content Column */
+    .solara-content > div > div {
+        display: flex !important;
+        flex-direction: column !important;
+    }
+
+    /* Mobile: Ensure proper stacking context */
+    @media (max-width: 768px) {
+        /* Main app container height fix for mobile */
+        .v-application--wrap {
+            height: 100vh !important;
+            height: 100dvh !important;  /* Dynamic viewport height */
+            min-height: -webkit-fill-available !important;  /* iOS Safari fallback */
+        }
+
+        html {
+            height: -webkit-fill-available;
+        }
     }
     /* Override Vuetify defaults */
     .v-btn {
@@ -808,6 +872,17 @@ GLOBAL_CSS = """
     }
     .v-overlay {
         z-index: 9998 !important;
+    }
+
+    /* ===== TOOLBAR CONTAINER - CRITICAL FOR MOBILE ===== */
+    /* Prevent toolbar from collapsing in flex container */
+    .toolbar-filters {
+        flex-shrink: 0 !important;
+        flex-grow: 0 !important;
+        min-height: 52px !important;
+        background: #ffffff !important;
+        position: relative !important;
+        z-index: 100 !important;  /* Above normal content, below overlays */
     }
 
     /* ===== TOOLBAR ROW LAYOUT ===== */
@@ -949,98 +1024,194 @@ GLOBAL_CSS = """
         padding: 4px 0 !important;
     }
 
-    /* ===== RESPONSIVE BREAKPOINTS (Sprint 6) ===== */
+    /* ===== RESPONSIVE BREAKPOINTS ===== */
+    /*
+     * CRITICAL: Solara/Vuetify inject their own flex styles.
+     * We use ultra-high specificity selectors to override them.
+     * Pattern: html body .v-application [class]
+     */
 
-    /* ----- TOOLBAR PRIORITY CLASSES ----- */
-    /* Priority-based hiding: low priority items hide first */
+    /* ===== DESKTOP (>1200px) - Explicit media query ===== */
+    @media (min-width: 1201px) {
+        /* Toolbar row: horizontal layout - HIGH SPECIFICITY */
+        html body .v-application .toolbar-row,
+        html body .v-application .toolbar-row.row,
+        html body .v-application .toolbar-row.v-col,
+        html body .v-application div.toolbar-row {
+            display: flex !important;
+            flex-direction: row !important;
+            flex-wrap: nowrap !important;
+            align-items: center !important;
+            gap: 8px !important;
+        }
 
-    /* Items with priority-low class hide first (STH, ENI indicators) */
-    @media (max-width: 1100px) {
-        .toolbar-priority-low {
+        /* Desktop: Indicators section visible */
+        html body .v-application .toolbar-indicators-section,
+        .toolbar-indicators-section {
+            display: flex !important;
+        }
+
+        /* Desktop: Hide overflow-only items */
+        html body .v-application .overflow-show-at-1100,
+        html body .v-application .overflow-show-at-900,
+        html body .v-application .overflow-show-at-600,
+        html body .v-application .overflow-show-supt,
+        html body .v-application .overflow-mobile-only,
+        .overflow-show-at-1100,
+        .overflow-show-at-900,
+        .overflow-show-at-600,
+        .overflow-show-supt,
+        .overflow-mobile-only {
             display: none !important;
         }
-        /* Show corresponding items in overflow */
-        .overflow-show-at-1100 {
-            display: block !important;
-        }
-    }
 
-    /* Items with priority-high class hide later (Gaps, Offices toggles) */
-    @media (max-width: 900px) {
-        .toolbar-priority-high {
-            display: none !important;
-        }
-        /* Show corresponding items in overflow */
-        .overflow-show-at-900 {
-            display: block !important;
-        }
-    }
-
-    /* Hide overflow-only items when their toolbar counterparts are visible */
-    .overflow-show-at-1100,
-    .overflow-show-at-900 {
-        display: none !important;
-    }
-
-    /* ----- OVERFLOW MENU VISIBILITY ----- */
-    /* Hide overflow menu at wide screens */
-    .overflow-menu-container {
-        display: none !important;
-    }
-
-    /* Show overflow menu when priority-low items start hiding */
-    @media (max-width: 1100px) {
+        /* Desktop: overflow menu hidden */
+        html body .v-application .overflow-menu-container,
         .overflow-menu-container {
-            display: flex !important;
-        }
-    }
-
-    /* ----- TOOLBAR DROPDOWN HIDING ----- */
-    /* Superintendent dropdown in overflow hidden by default */
-    .overflow-show-supt {
-        display: none !important;
-    }
-
-    /* Hide Superintendent dropdown in toolbar, show in overflow at 1000px */
-    @media (max-width: 1000px) {
-        .supt-dropdown-toolbar {
             display: none !important;
         }
-        .overflow-show-supt {
-            display: flex !important;
-        }
-    }
 
-    /* Shrink dropdown widths on narrow screens */
-    @media (max-width: 900px) {
-        .toolbar-filters .v-input {
-            max-width: 90px !important;
-        }
-        .toolbar-filters .v-select__selection {
-            font-size: 11px !important;
-        }
-    }
-
-    /* Even narrower: hide District dropdown too */
-    @media (max-width: 700px) {
-        /* Keep only Borough dropdown visible */
-        .toolbar-filters .v-input:nth-child(4) {
-            display: none !important;
-        }
-    }
-
-    /* ----- SIDEBAR TOGGLE VISIBILITY ----- */
-    /* Hide sidebar toggle button at wide screens */
-    .sidebar-toggle-btn {
-        display: none !important;
-    }
-
-    /* Show sidebar toggle at narrow screens where sidebar auto-hides */
-    @media (max-width: 900px) {
+        /* Desktop: sidebar toggle (hamburger) hidden */
+        html body .v-application .sidebar-toggle-btn,
         .sidebar-toggle-btn {
+            display: none !important;
+        }
+
+        /* Desktop: header spacer hidden (not needed when in row mode) */
+        html body .v-application .header-spacer,
+        .header-spacer {
+            display: none !important;
+        }
+
+        /* Desktop: Show all toolbar sections inline */
+        html body .v-application .toolbar-header-section,
+        html body .v-application .toolbar-filters-section,
+        html body .v-application .toolbar-toggles-section {
+            display: flex !important;
+            flex-direction: row !important;
+            flex-shrink: 0 !important;
+        }
+
+        /* Desktop: desktop-only elements visible */
+        html body .v-application .desktop-only,
+        .desktop-only {
             display: inline-flex !important;
         }
     }
+
+    /* ===== TABLET/MOBILE (≤1200px) ===== */
+    @media (max-width: 1200px) {
+        /* Show overflow menu - HIGH SPECIFICITY */
+        html body .v-application .overflow-menu-container,
+        .overflow-menu-container {
+            display: flex !important;
+            z-index: 10000 !important;
+            position: relative !important;
+        }
+
+        /* Show hamburger for sidebar toggle */
+        html body .v-application .sidebar-toggle-btn,
+        .sidebar-toggle-btn {
+            display: inline-flex !important;
+        }
+
+        /* Show header spacer - pushes overflow to right */
+        html body .v-application .header-spacer,
+        .header-spacer {
+            display: block !important;
+            flex: 1 1 auto !important;
+        }
+
+        /* Hide desktop-only indicators - HIGH SPECIFICITY */
+        html body .v-application .toolbar-indicators-section,
+        .toolbar-indicators-section {
+            display: none !important;
+        }
+        html body .v-application .desktop-only,
+        .desktop-only {
+            display: none !important;
+        }
+
+        /* Show items in overflow menu */
+        html body .v-application .overflow-show-at-1100,
+        html body .v-application .overflow-mobile-only,
+        .overflow-show-at-1100,
+        .overflow-mobile-only {
+            display: block !important;
+        }
+
+        /* Toolbar: switch to column (stacked) layout - HIGH SPECIFICITY */
+        html body .v-application .toolbar-row,
+        html body .v-application .toolbar-row.row,
+        html body .v-application .toolbar-row.v-col,
+        html body .v-application div.toolbar-row {
+            display: flex !important;
+            flex-direction: column !important;
+            height: auto !important;
+            min-height: auto !important;
+            padding: 8px 12px !important;
+            gap: 8px !important;
+            z-index: 1100 !important;
+            position: relative !important;
+        }
+
+        /* Header section: row layout (hamburger + search + title + overflow) */
+        html body .v-application .toolbar-header-section,
+        .toolbar-header-section {
+            display: flex !important;
+            flex-direction: row !important;
+            align-items: center !important;
+            gap: 8px !important;
+            width: 100% !important;
+        }
+
+        /* Filter dropdowns: full width, stretch evenly */
+        html body .v-application .toolbar-filters-section,
+        .toolbar-filters-section {
+            width: 100% !important;
+            display: flex !important;
+            flex-direction: row !important;
+            gap: 8px !important;
+        }
+        .toolbar-filters-section .v-input,
+        .toolbar-filters-section .solara-select,
+        .toolbar-filters-section > div {
+            flex: 1 1 0 !important;
+            min-width: 0 !important;
+            max-width: none !important;
+        }
+
+        /* Toggle buttons: full width, evenly distributed */
+        html body .v-application .toolbar-toggles-section,
+        .toolbar-toggles-section {
+            width: 100% !important;
+            display: flex !important;
+            flex-direction: row !important;
+            flex-wrap: nowrap !important;
+            gap: 6px !important;
+        }
+        .toolbar-toggles-section .v-btn,
+        .toolbar-toggles-section > div {
+            flex: 1 1 0 !important;
+            min-width: 0 !important;
+        }
+
+        /* Hide desktop-only spacers and dividers */
+        html body .v-application .toolbar-spacer,
+        html body .v-application .toolbar-divider-desktop,
+        .toolbar-spacer,
+        .toolbar-divider-desktop {
+            display: none !important;
+        }
+
+        /* Overflow dropdown z-index */
+        .overflow-dropdown {
+            z-index: 10001 !important;
+        }
+    }
+
+    /* ----- NARROW TABLET (1000px): Superintendent dropdown stays visible ----- */
+    /* Removed: supt-dropdown hiding - user wants it visible at all breakpoints */
 
     /* ----- SIDEBAR WIDTH ----- */
     /* Full sidebar on wide screens */
@@ -1069,23 +1240,329 @@ GLOBAL_CSS = """
         }
     }
 
-    /* Hide sidebar by default at narrow screens (toggle controls it) */
-    @media (max-width: 900px) {
+    /* ----- MOBILE (768px): Sidebar overlays map ----- */
+    @media (max-width: 768px) {
+        /* Main container: fixed to viewport */
+        .main-app-container {
+            height: 100vh !important;
+            height: 100dvh !important;
+            overflow: hidden !important;
+            display: flex !important;
+            flex-direction: column !important;
+        }
+
+        /* Toolbar: takes natural height */
+        .toolbar-filters {
+            flex-shrink: 0 !important;
+            flex-grow: 0 !important;
+            z-index: 1100 !important;
+            background: #ffffff !important;
+        }
+
+        /* Content row: fills remaining space */
+        .content-row {
+            flex: 1 !important;
+            min-height: 0 !important;
+            overflow: hidden !important;
+        }
+
+        /* Sidebar: overlays on mobile */
         .info-panel-container {
-            position: absolute;
-            left: 0;
-            top: 0;
-            z-index: 1000;
-            height: 100%;
-            box-shadow: 4px 0 12px rgba(0,0,0,0.15);
+            position: absolute !important;
+            left: 0 !important;
+            top: 0 !important;
+            z-index: 1200 !important;
+            height: 100% !important;
+            width: 320px !important;
+            min-width: 320px !important;
+            max-width: 320px !important;
+            box-shadow: 4px 0 12px rgba(0,0,0,0.15) !important;
+            flex-shrink: 0 !important;
         }
 
         .info-panel-container.sidebar-closed {
-            margin-left: -360px;
-            width: 0;
-            min-width: 0;
-            max-width: 0;
-            overflow: hidden;
+            transform: translateX(-100%) !important;
+            width: 0 !important;
+            min-width: 0 !important;
+            max-width: 0 !important;
+            overflow: hidden !important;
+            box-shadow: none !important;
+        }
+
+        /* Ensure toolbar items can shrink but fill available space */
+        .toolbar-filters .v-input {
+            flex-shrink: 1 !important;
+            flex-grow: 1 !important;
+            min-width: 0 !important;
+        }
+
+        /* Hide legend on mobile - takes too much screen space */
+        .leaflet-top.leaflet-right {
+            display: none !important;
+        }
+
+        /* Ensure overflow menu is always visible on mobile - HIGH SPECIFICITY */
+        html body .v-application .overflow-menu-container,
+        .overflow-menu-container {
+            display: flex !important;
+        }
+
+        /* Ensure indicators section stays hidden at mobile */
+        html body .v-application .toolbar-indicators-section,
+        .toolbar-indicators-section {
+            display: none !important;
+        }
+
+        /* AGGRESSIVE viewport lock - prevent ALL scrolling on mobile */
+        html, body {
+            overflow: hidden !important;
+            position: fixed !important;
+            width: 100% !important;
+            height: 100% !important;
+            top: 0 !important;
+            left: 0 !important;
+            margin: 0 !important;
+            padding: 0 !important;
+        }
+
+        /* Lock Vuetify/Solara containers too */
+        .v-application,
+        .v-application--wrap,
+        .solara-container,
+        #app {
+            overflow: hidden !important;
+            position: fixed !important;
+            top: 0 !important;
+            left: 0 !important;
+            width: 100% !important;
+            height: 100% !important;
+            max-height: 100vh !important;
+            max-height: 100dvh !important;
+        }
+
+        /* Main app container - absolutely fixed */
+        .main-app-container {
+            position: fixed !important;
+            top: 0 !important;
+            left: 0 !important;
+            right: 0 !important;
+            bottom: 0 !important;
+            width: 100% !important;
+            height: 100vh !important;
+            height: 100dvh !important;
+            overflow: hidden !important;
+        }
+
+        /* Prevent any element from triggering scroll-into-view */
+        * {
+            scroll-margin: 0 !important;
+            scroll-padding: 0 !important;
+        }
+
+        /* CRITICAL: Allow scrolling INSIDE sidebar content area */
+        .sidebar-scrollable {
+            overflow-y: auto !important;
+            overflow-x: hidden !important;
+            -webkit-overflow-scrolling: touch !important;
+            overscroll-behavior: contain !important;
+            touch-action: pan-y !important;
+        }
+
+        /* Also ensure info-panel can contain scrollable content */
+        .info-panel-container {
+            overflow: hidden !important;
+            display: flex !important;
+            flex-direction: column !important;
+        }
+    }
+
+    /* Phone: Bottom sheet pattern for sidebar */
+    @media (max-width: 600px) {
+        /* REMOVED: Grid layout for toolbar-toggles-section was collapsing filters to left */
+        /* JavaScript now handles all toolbar responsive layout */
+
+        /* Override sidebar to be bottom sheet */
+        .info-panel-container {
+            /* Position at bottom instead of left */
+            top: auto !important;
+            bottom: 0 !important;
+            left: 0 !important;
+            right: 0 !important;
+            /* Full width, taller height (70% of screen) to account for browser chrome */
+            width: 100% !important;
+            min-width: 100% !important;
+            max-width: 100% !important;
+            /* Use dvh (dynamic viewport height) for browsers that support it, fallback to vh */
+            height: 70vh !important;
+            height: 70dvh !important;  /* Overrides previous line in supporting browsers */
+            /* Visual styling */
+            border-radius: 16px 16px 0 0 !important;
+            box-shadow: 0 -4px 20px rgba(0,0,0,0.15) !important;
+            /* Slide up/down instead of left/right */
+            transform: translateY(0) !important;
+            transition: transform 0.3s ease, opacity 0.3s ease !important;
+            /* CRITICAL: Allow touch events to reach scrollable children */
+            touch-action: auto !important;
+            pointer-events: auto !important;
+        }
+
+        .info-panel-container.sidebar-closed {
+            transform: translateY(100%) !important;
+            /* Reset width overrides from tablet breakpoint */
+            width: 100% !important;
+            min-width: 100% !important;
+            max-width: 100% !important;
+            height: 70vh !important;
+            height: 70dvh !important;
+        }
+
+        /* Bottom sheet drag handle - Solara Button styled as handle bar */
+        .bottom-sheet-handle {
+            display: flex !important;
+            justify-content: center;
+            align-items: center;
+            min-height: 28px !important;
+            height: 28px !important;
+            width: 100% !important;
+            background: transparent !important;
+            box-shadow: none !important;
+            border: none !important;
+            flex-shrink: 0;
+            position: relative;
+        }
+
+        /* Override Vuetify button ripple and focus styles */
+        .bottom-sheet-handle.v-btn::before,
+        .bottom-sheet-handle .v-btn__overlay {
+            display: none !important;
+        }
+
+        /* Visual pill indicator using ::after */
+        .bottom-sheet-handle::after {
+            content: '';
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            width: 40px;
+            height: 4px;
+            background: #9ca3af;
+            border-radius: 2px;
+        }
+
+        /* Hover feedback */
+        .bottom-sheet-handle:hover::after {
+            background: #6b7280;
+        }
+
+        .bottom-sheet-handle:active::after {
+            background: #4b5563;
+        }
+
+        /* CRITICAL: Phone-specific scrollable content within bottom sheet */
+        .sidebar-scrollable {
+            flex: 1 1 0 !important;
+            min-height: 0 !important;
+            /* Explicit max-height: bottom sheet (70vh) minus handle (28px) minus mode selector (~80px) minus stats (~60px) */
+            max-height: calc(70vh - 170px) !important;
+            max-height: calc(70dvh - 170px) !important;  /* Dynamic viewport fallback */
+            height: auto !important;
+            overflow-y: scroll !important;  /* 'scroll' forces scrollbar, more reliable than 'auto' on iOS */
+            overflow-x: hidden !important;
+            -webkit-overflow-scrolling: touch !important;
+            overscroll-behavior-y: contain !important;
+            touch-action: pan-y !important;
+            /* Ensure this element receives touch events */
+            pointer-events: auto !important;
+        }
+
+        /* Ensure content inside scrollable area doesn't block touch */
+        .sidebar-scrollable > * {
+            pointer-events: auto !important;
+        }
+
+        /* CRITICAL: School detail sidebar - make ENTIRE content scrollable on mobile */
+        .school-sidebar-container {
+            height: 100% !important;  /* Fill parent (70vh bottom sheet) instead of 100vh */
+            max-height: calc(70vh - 28px) !important;  /* Bottom sheet minus drag handle */
+            max-height: calc(70dvh - 28px) !important;  /* Dynamic viewport fallback */
+            overflow-y: scroll !important;  /* Make the whole thing scrollable */
+            overflow-x: hidden !important;
+            -webkit-overflow-scrolling: touch !important;
+            overscroll-behavior-y: contain !important;
+            touch-action: pan-y !important;
+            display: block !important;  /* Change from flex to block for natural flow */
+        }
+
+        /* First child (header with back button) - sticky at top */
+        .school-sidebar-container > div:first-child {
+            position: sticky !important;
+            top: 0 !important;
+            z-index: 10 !important;
+            background: white !important;
+        }
+
+        /* Tab content area - no longer needs its own scroll, parent scrolls */
+        .school-sidebar-tab-content {
+            overflow: visible !important;  /* Let parent handle scroll */
+            min-height: auto !important;
+            flex: none !important;
+        }
+
+        /* ===== COMPACT HEADER FOR MOBILE ===== */
+        /* Reduce padding in header section */
+        .school-sidebar-container > div:first-child {
+            padding: 8px 12px !important;  /* Reduced from 12px 16px */
+            gap: 4px !important;
+        }
+
+        /* Smaller back button */
+        .school-sidebar-container > div:first-child > button {
+            font-size: 11px !important;
+            padding: 2px 6px !important;
+            margin-bottom: 4px !important;
+        }
+
+        /* Compact school name */
+        .school-sidebar-container h2 {
+            font-size: 13px !important;  /* Reduced from 15px */
+            margin: 0 0 2px 0 !important;
+        }
+
+        /* Compact DBN and reduce spacing */
+        .school-sidebar-container > div:first-child p {
+            font-size: 10px !important;
+            margin: 0 0 4px 0 !important;  /* Reduced from 8px */
+        }
+
+        /* Compact training status badge */
+        .school-sidebar-container > div:first-child > div:last-child {
+            padding: 3px 8px !important;
+            font-size: 10px !important;
+        }
+
+        /* Compact Training Depth section */
+        .school-sidebar-container > div:nth-child(2) {
+            padding: 8px 12px !important;  /* Reduced from 12px 16px */
+            gap: 6px !important;
+        }
+
+        /* Compact tab buttons */
+        .school-sidebar-container > div:nth-child(3) button {
+            padding: 8px 10px !important;  /* Reduced from 10px 14px */
+            font-size: 11px !important;
+        }
+
+        /* Compact tab content padding */
+        .school-sidebar-tab-content {
+            padding: 12px !important;  /* Reduced from 16px */
+        }
+    }
+
+    /* Hide drag handle on tablet/desktop where sidebar is on the side */
+    @media (min-width: 601px) {
+        .bottom-sheet-handle {
+            display: none !important;
         }
     }
 
@@ -1137,6 +1614,464 @@ GLOBAL_CSS = """
         background-color: #FFEDD5 !important;  /* Deeper orange tint */
     }
 </style>
+
+<script>
+// =====================================================================
+// SCROLL PREVENTION FOR MOBILE
+// Only reset page scroll after MAP interactions - NOT on sidebar changes
+// This allows sidebar content to scroll normally
+// =====================================================================
+(function() {
+    function isPhoneWidth() {
+        return window.innerWidth <= 600;
+    }
+
+    function resetPageScroll() {
+        // Only reset page-level scroll, NOT sidebar scroll
+        window.scrollTo(0, 0);
+        document.documentElement.scrollTop = 0;
+        document.body.scrollTop = 0;
+
+        // Reset app containers but NOT .sidebar-scrollable
+        var containers = document.querySelectorAll(
+            '.v-application, .v-application--wrap, .solara-container, ' +
+            '.main-app-container, #app'
+        );
+        containers.forEach(function(c) {
+            // Skip if this is the sidebar scrollable area
+            if (c && !c.classList.contains('sidebar-scrollable')) {
+                c.scrollTop = 0;
+                c.scrollLeft = 0;
+            }
+        });
+    }
+
+    // === BURST MODE: Run reset rapidly for N frames ===
+    function burstReset(durationMs) {
+        var endTime = Date.now() + durationMs;
+        function frame() {
+            resetPageScroll();
+            if (Date.now() < endTime) {
+                requestAnimationFrame(frame);
+            }
+        }
+        requestAnimationFrame(frame);
+    }
+
+    // === Watch for MAP interactions only ===
+    function startMapObserver() {
+        var mapContainer = document.querySelector('.leaflet-container');
+        if (!mapContainer) {
+            setTimeout(startMapObserver, 500);
+            return;
+        }
+
+        // After any touch/click on map, burst reset for 500ms
+        mapContainer.addEventListener('touchend', function() {
+            if (!isPhoneWidth()) return;
+            burstReset(500);
+        }, { passive: true });
+
+        mapContainer.addEventListener('click', function() {
+            if (!isPhoneWidth()) return;
+            burstReset(500);
+        }, { passive: true });
+    }
+
+    // === Window scroll listener - only catch unwanted page scrolls ===
+    window.addEventListener('scroll', function() {
+        if (!isPhoneWidth()) return;
+        // Only reset if it's actual page scroll (window.scrollY > 0)
+        if (window.scrollY > 0 || document.documentElement.scrollTop > 0) {
+            resetPageScroll();
+        }
+    }, { passive: true });
+
+    // Start map observer when DOM is ready
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', function() {
+            startMapObserver();
+        });
+    } else {
+        startMapObserver();
+    }
+})();
+
+// =====================================================================
+// RESPONSIVE TOOLBAR LAYOUT
+// Overrides Solara's inline flex-direction based on viewport width
+// =====================================================================
+(function() {
+    console.log('[TOOLBAR] Responsive toolbar script loaded');
+    var DESKTOP_BREAKPOINT = 1200;
+
+    function applyToolbarLayout() {
+        var isDesktop = window.innerWidth > DESKTOP_BREAKPOINT;
+        console.log('[TOOLBAR] applyToolbarLayout called, isDesktop=' + isDesktop + ', width=' + window.innerWidth);
+
+        // Main toolbar container
+        var toolbarRow = document.querySelector('.toolbar-row');
+        console.log('[TOOLBAR] toolbarRow found:', toolbarRow ? 'YES' : 'NO');
+        if (toolbarRow) {
+            if (isDesktop) {
+                // Desktop: horizontal row layout
+                toolbarRow.style.flexDirection = 'row';
+                toolbarRow.style.flexWrap = 'nowrap';
+                toolbarRow.style.alignItems = 'center';
+                toolbarRow.style.gap = '8px';
+                toolbarRow.style.padding = '0 16px';
+                toolbarRow.style.justifyContent = 'flex-start';
+            } else {
+                // Mobile/Tablet: vertical column layout
+                toolbarRow.style.flexDirection = 'column';
+                toolbarRow.style.flexWrap = 'nowrap';
+                toolbarRow.style.alignItems = 'stretch';
+                toolbarRow.style.gap = '8px';
+                toolbarRow.style.padding = '8px 12px';
+                toolbarRow.style.justifyContent = 'flex-start';
+            }
+        }
+
+        // Header section - always visible, row layout
+        var headerSection = document.querySelector('.toolbar-header-section');
+        if (headerSection) {
+            headerSection.style.display = 'flex';
+            headerSection.style.flexDirection = 'row';
+            headerSection.style.alignItems = 'center';
+            headerSection.style.flexShrink = '0';
+            if (isDesktop) {
+                headerSection.style.width = 'auto';
+            } else {
+                headerSection.style.width = '100%';
+            }
+        }
+
+        // Hamburger menu (sidebar toggle) - only at mobile
+        var hamburger = document.querySelector('.sidebar-toggle-btn');
+        if (hamburger) {
+            hamburger.style.display = isDesktop ? 'none' : 'inline-flex';
+        }
+
+        // Overflow menu container - only at mobile
+        var overflowMenu = document.querySelector('.overflow-menu-container');
+        if (overflowMenu) {
+            overflowMenu.style.display = isDesktop ? 'none' : 'flex';
+        }
+
+        // Header spacer (pushes overflow to right at mobile)
+        var headerSpacer = document.querySelector('.header-spacer');
+        if (headerSpacer) {
+            if (isDesktop) {
+                headerSpacer.style.display = 'none';
+            } else {
+                headerSpacer.style.display = 'block';
+                headerSpacer.style.flex = '1 1 auto';
+            }
+        }
+
+        // Filter section - ALWAYS visible
+        var filtersSection = document.querySelector('.toolbar-filters-section');
+        if (filtersSection) {
+            filtersSection.style.display = 'flex';
+            filtersSection.style.flexDirection = 'row';
+            filtersSection.style.alignItems = 'center';
+            filtersSection.style.gap = '6px';
+            if (isDesktop) {
+                filtersSection.style.width = 'auto';
+                filtersSection.style.flex = '0 0 auto';
+            } else {
+                filtersSection.style.width = '100%';
+                filtersSection.style.flex = '1 1 auto';
+            }
+            // Make filter dropdowns stretch evenly at mobile
+            var filterInputs = filtersSection.querySelectorAll('.v-input, .solara-select, [class*="v-select"]');
+            filterInputs.forEach(function(input) {
+                if (isDesktop) {
+                    input.style.flex = '0 0 auto';
+                    input.style.minWidth = '120px';
+                } else {
+                    input.style.flex = '1 1 0';
+                    input.style.minWidth = '0';
+                    input.style.maxWidth = 'none';
+                }
+            });
+            // Also target direct children divs (Solara wrappers)
+            var filterDivs = filtersSection.querySelectorAll(':scope > div');
+            filterDivs.forEach(function(div) {
+                if (!isDesktop) {
+                    div.style.flex = '1 1 0';
+                    div.style.minWidth = '0';
+                }
+            });
+        }
+
+        // Toggles section - ALWAYS visible
+        var togglesSection = document.querySelector('.toolbar-toggles-section');
+        if (togglesSection) {
+            togglesSection.style.display = 'flex';
+            togglesSection.style.flexDirection = 'row';
+            togglesSection.style.alignItems = 'center';
+            togglesSection.style.gap = '4px';
+            if (isDesktop) {
+                togglesSection.style.width = 'auto';
+                togglesSection.style.flex = '0 0 auto';
+            } else {
+                togglesSection.style.width = '100%';
+                togglesSection.style.flex = '1 1 auto';
+            }
+            // Make toggle buttons stretch evenly at mobile
+            var toggleBtns = togglesSection.querySelectorAll('.v-btn, button');
+            toggleBtns.forEach(function(btn) {
+                if (isDesktop) {
+                    btn.style.flex = '0 0 auto';
+                } else {
+                    btn.style.flex = '1 1 0';
+                    btn.style.minWidth = '0';
+                }
+            });
+            // Also target direct children divs (Solara wrappers)
+            var toggleDivs = togglesSection.querySelectorAll(':scope > div');
+            toggleDivs.forEach(function(div) {
+                if (!isDesktop) {
+                    div.style.flex = '1 1 0';
+                    div.style.minWidth = '0';
+                }
+            });
+        }
+
+        // Indicators section (STH, ENI, Reset, CSV) - desktop only
+        var indicatorsSection = document.querySelector('.toolbar-indicators-section');
+        if (indicatorsSection) {
+            if (isDesktop) {
+                indicatorsSection.style.display = 'flex';
+                indicatorsSection.style.flexDirection = 'row';
+                indicatorsSection.style.alignItems = 'center';
+                indicatorsSection.style.gap = '4px';
+                indicatorsSection.style.flexShrink = '0';
+            } else {
+                indicatorsSection.style.display = 'none';
+            }
+        }
+
+        // Desktop-only elements (dividers, individual buttons)
+        var desktopOnly = document.querySelectorAll('.desktop-only');
+        desktopOnly.forEach(function(el) {
+            el.style.display = isDesktop ? 'inline-flex' : 'none';
+        });
+
+        // Desktop spacers - only show at desktop
+        var spacer = document.querySelector('.toolbar-spacer');
+        if (spacer) {
+            if (isDesktop) {
+                spacer.style.display = 'block';
+                spacer.style.flex = '1 1 auto';
+            } else {
+                spacer.style.display = 'none';
+            }
+        }
+
+        // Desktop dividers
+        var dividers = document.querySelectorAll('.toolbar-divider-desktop');
+        dividers.forEach(function(el) {
+            el.style.display = isDesktop ? 'block' : 'none';
+        });
+
+        // Superintendent dropdown - always visible (enough space at all sizes)
+        var suptDropdown = document.querySelector('.supt-dropdown');
+        if (suptDropdown) {
+            suptDropdown.style.display = 'block';
+        }
+    }
+
+    // Apply on load and resize
+    function initToolbarResponsive() {
+        // Initial application
+        applyToolbarLayout();
+
+        // Re-apply on resize (debounced)
+        var resizeTimeout;
+        window.addEventListener('resize', function() {
+            clearTimeout(resizeTimeout);
+            resizeTimeout = setTimeout(applyToolbarLayout, 100);
+        });
+
+        // Re-apply periodically to catch Solara re-renders
+        // Solara may re-render components and reset inline styles
+        setInterval(applyToolbarLayout, 500);
+    }
+
+    // Wait for toolbar to exist
+    function waitForToolbar() {
+        if (document.querySelector('.toolbar-row')) {
+            initToolbarResponsive();
+        } else {
+            setTimeout(waitForToolbar, 100);
+        }
+    }
+
+    // Start when DOM is ready
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', waitForToolbar);
+    } else {
+        waitForToolbar();
+    }
+})();
+</script>
+
+<!-- Bootstrap JavaScript execution via img onerror (workaround for innerHTML not executing scripts) -->
+<img src="data:," onerror="
+(function() {
+    console.log('[TOOLBAR-BOOT] Bootstrapping toolbar responsive script...');
+
+    // Re-inject the toolbar script as a proper script element
+    var script = document.createElement('script');
+    script.textContent = `
+        (function() {
+            console.log('[TOOLBAR] Script running via bootstrap');
+            var DESKTOP_BREAKPOINT = 1200;
+
+            function applyToolbarLayout() {
+                var isDesktop = window.innerWidth > DESKTOP_BREAKPOINT;
+                console.log('[TOOLBAR] Layout applied, isDesktop=' + isDesktop + ', width=' + window.innerWidth);
+
+                var toolbarRow = document.querySelector('.toolbar-row');
+                if (toolbarRow) {
+                    if (isDesktop) {
+                        toolbarRow.style.flexDirection = 'row';
+                        toolbarRow.style.flexWrap = 'nowrap';
+                        toolbarRow.style.alignItems = 'center';
+                        toolbarRow.style.gap = '6px';
+                        toolbarRow.style.padding = '0 12px';
+                        toolbarRow.style.overflow = 'hidden';
+                    } else {
+                        toolbarRow.style.flexDirection = 'column';
+                        toolbarRow.style.alignItems = 'stretch';
+                        toolbarRow.style.gap = '8px';
+                        toolbarRow.style.padding = '8px 12px';
+                        toolbarRow.style.overflow = 'visible';
+                    }
+                }
+
+                // Header section - shrink at desktop
+                var headerSection = document.querySelector('.toolbar-header-section');
+                if (headerSection) {
+                    headerSection.style.display = 'flex';
+                    headerSection.style.flexShrink = '0';
+                    headerSection.style.width = isDesktop ? 'auto' : '100%';
+                }
+
+                // Hamburger - hide at desktop
+                var hamburger = document.querySelector('.sidebar-toggle-btn');
+                if (hamburger) hamburger.style.display = isDesktop ? 'none' : 'inline-flex';
+
+                // Overflow menu - hide at desktop
+                var overflow = document.querySelector('.overflow-menu-container');
+                if (overflow) overflow.style.display = isDesktop ? 'none' : 'flex';
+
+                // Header spacer - hide at desktop
+                var spacer = document.querySelector('.header-spacer');
+                if (spacer) {
+                    spacer.style.display = isDesktop ? 'none' : 'block';
+                    if (!isDesktop) spacer.style.flex = '1 1 auto';
+                }
+
+                // Filters section - shrinkable at desktop, full-width at mobile
+                var filters = document.querySelector('.toolbar-filters-section');
+                if (filters) {
+                    filters.style.display = 'flex';
+                    filters.style.flexDirection = 'row';
+                    filters.style.flexWrap = 'nowrap';
+                    filters.style.flexShrink = isDesktop ? '1' : '0';
+                    filters.style.flexGrow = isDesktop ? '0' : '1';
+                    filters.style.width = isDesktop ? 'auto' : '100%';
+                    filters.style.gap = '4px';
+                    filters.style.justifyContent = isDesktop ? 'flex-start' : 'stretch';
+                    // Make dropdowns shrinkable at desktop, equal-stretch at mobile
+                    filters.querySelectorAll(':scope > div').forEach(function(d) {
+                        d.style.flex = isDesktop ? '1 1 100px' : '1 1 0';
+                        d.style.minWidth = isDesktop ? '80px' : '0';
+                        d.style.maxWidth = isDesktop ? '160px' : 'none';
+                        d.style.width = isDesktop ? 'auto' : 'auto';
+                    });
+                    // Target the actual Vuetify inputs
+                    filters.querySelectorAll('.v-input').forEach(function(inp) {
+                        inp.style.flex = isDesktop ? '0 1 auto' : '1 1 0';
+                        inp.style.minWidth = isDesktop ? '80px' : '0';
+                        inp.style.maxWidth = isDesktop ? '160px' : 'none';
+                        inp.style.width = isDesktop ? 'auto' : '100%';
+                    });
+                }
+
+                // Toggles section - shrinkable at desktop, full-width at mobile
+                var toggles = document.querySelector('.toolbar-toggles-section');
+                if (toggles) {
+                    toggles.style.display = 'flex';
+                    toggles.style.flexDirection = 'row';
+                    toggles.style.flexWrap = 'nowrap';
+                    toggles.style.flexShrink = isDesktop ? '1' : '0';
+                    toggles.style.flexGrow = isDesktop ? '0' : '1';
+                    toggles.style.width = isDesktop ? 'auto' : '100%';
+                    toggles.style.gap = '4px';
+                    toggles.style.justifyContent = isDesktop ? 'flex-start' : 'stretch';
+                    toggles.querySelectorAll(':scope > div').forEach(function(d) {
+                        d.style.flex = isDesktop ? '0 1 auto' : '1 1 0';
+                        d.style.minWidth = '0';
+                    });
+                    // Make buttons stretch to fill their containers on mobile
+                    toggles.querySelectorAll('.v-btn').forEach(function(btn) {
+                        btn.style.minWidth = isDesktop ? '50px' : '0';
+                        btn.style.flex = isDesktop ? '0 0 auto' : '1 1 0';
+                        btn.style.width = isDesktop ? 'auto' : '100%';
+                        btn.style.paddingLeft = isDesktop ? '8px' : '10px';
+                        btn.style.paddingRight = isDesktop ? '8px' : '10px';
+                    });
+                }
+
+                // Indicators section - desktop only, shrinkable
+                var indicators = document.querySelector('.toolbar-indicators-section');
+                if (indicators) {
+                    indicators.style.display = isDesktop ? 'flex' : 'none';
+                    indicators.style.flexShrink = '0';
+                    indicators.style.gap = '4px';
+                }
+
+                // Desktop-only elements
+                document.querySelectorAll('.desktop-only').forEach(function(el) {
+                    el.style.display = isDesktop ? 'inline-flex' : 'none';
+                });
+
+                // Toolbar spacer - HIDE to save space
+                var tbSpacer = document.querySelector('.toolbar-spacer');
+                if (tbSpacer) {
+                    tbSpacer.style.display = 'none';
+                }
+
+                // Hide dividers at narrower widths to save space
+                document.querySelectorAll('.toolbar-divider-desktop').forEach(function(el) {
+                    el.style.display = (isDesktop && window.innerWidth > 1400) ? 'block' : 'none';
+                });
+            }
+
+            function waitForToolbar() {
+                if (document.querySelector('.toolbar-row')) {
+                    applyToolbarLayout();
+                    window.addEventListener('resize', function() { setTimeout(applyToolbarLayout, 100); });
+                    setInterval(applyToolbarLayout, 500);
+                } else {
+                    setTimeout(waitForToolbar, 100);
+                }
+            }
+
+            if (document.readyState === 'loading') {
+                document.addEventListener('DOMContentLoaded', waitForToolbar);
+            } else {
+                waitForToolbar();
+            }
+        })();
+    `;
+    document.head.appendChild(script);
+})();
+" style="display:none;">
 """
 
 # ============================================================================
@@ -1212,52 +2147,51 @@ def Toolbar(
         },
         classes=["toolbar-filters"]
     ):
-        # Single row with flexbox: title left, filters right
-        with solara.Row(
+        # Main toolbar container
+        with solara.Column(
+            classes=["toolbar-row"],
             style={
-                "display": "flex",
-                "align-items": "center",
-                "height": "52px",
+                "min-height": "52px",
                 "background": "#ffffff",
                 "border-bottom": "1px solid #e5e7eb",
                 "padding": "0 16px",
                 "margin": "0",
-                "gap": "0",
                 "box-shadow": "0 1px 2px rgba(0,0,0,0.04)",
-                "flex-wrap": "nowrap",
             }
         ):
-            # ===== LEFT SECTION: Hamburger + Title + Search =====
-            # Sidebar toggle button (hamburger) - visible at narrow widths
-            solara.Button(
-                label="",
-                icon_name="mdi-menu",
-                on_click=lambda: sidebar_open.set(not sidebar_open.value),
-                classes=["sidebar-toggle-btn"],
+            # ===== ROW 1 (MOBILE): Header Section - Hamburger + Search + Title + Overflow =====
+            # IMPORTANT: Overflow menu is INSIDE this row so it stays on same line at mobile
+            with solara.Row(
+                classes=["toolbar-header-section"],
                 style={
-                    "width": "36px",
-                    "height": "36px",
-                    "min-width": "36px",
-                    "padding": "0",
-                    "background": "#f0f2f6" if sidebar_open.value else "transparent",
-                    "border": "1px solid #e5e7eb" if sidebar_open.value else "none",
-                    "border-radius": "6px",
-                    "color": "#6B9080" if sidebar_open.value else "#6b7280",
-                    "margin-right": "8px",
-                    "flex-shrink": "0",
-                }
-            )
-
-            # Clickable search icon that expands to input field
-            if not search_expanded.value:
-                # Collapsed state: Icon + Title (clicking icon expands search)
-                with solara.Row(style={
                     "display": "flex",
                     "align-items": "center",
                     "gap": "8px",
                     "flex-shrink": "0",
-                    "margin-right": "16px",
-                }):
+                    "width": "100%",  # Stretch full width at mobile
+                }
+            ):
+                # Sidebar toggle button (hamburger)
+                solara.Button(
+                    label="",
+                    icon_name="mdi-menu",
+                    on_click=lambda: sidebar_open.set(not sidebar_open.value),
+                    classes=["sidebar-toggle-btn"],
+                    style={
+                        "width": "36px",
+                        "height": "36px",
+                        "min-width": "36px",
+                        "padding": "0",
+                        "background": "#f0f2f6" if sidebar_open.value else "transparent",
+                        "border": "1px solid #e5e7eb" if sidebar_open.value else "none",
+                        "border-radius": "6px",
+                        "color": "#6B9080" if sidebar_open.value else "#6b7280",
+                        "flex-shrink": "0",
+                    }
+                )
+
+                # Clickable search icon that expands to input field
+                if not search_expanded.value:
                     solara.Button(
                         label="",
                         icon_name="mdi-magnify",
@@ -1277,45 +2211,32 @@ def Toolbar(
                             HTYPE Dashboard
                         </span>
                     """)
-            else:
-                # Expanded state: Search autocomplete field
-                with solara.Row(style={
-                    "display": "flex",
-                    "align-items": "center",
-                    "gap": "6px",
-                    "flex-shrink": "0",
-                    "margin-right": "16px",
-                    "min-width": "280px",
-                }):
-                    # Handler for autocomplete selection - navigates directly to school
+                else:
+                    # Expanded state: Search autocomplete field
+                    # Handler for autocomplete selection
                     def handle_school_selection(dbn):
                         if dbn and on_school_select:
                             on_school_select(dbn)
-                            search_expanded.set(False)  # Collapse search after selection
+                            search_expanded.set(False)
                         elif not dbn:
-                            # Cleared - just update the search query
                             search_query.set("")
 
-                    # Vuetify Autocomplete with direct navigation on select
-                    # Uses item_text/item_value so display shows "School Name (DBN)"
-                    # but only the DBN is passed to the handler
                     rv.Autocomplete(
                         items=school_items or [],
-                        item_text="text",      # Display property
-                        item_value="value",    # Value stored in v_model (DBN)
+                        item_text="text",
+                        item_value="value",
                         v_model=search_query.value,
                         on_v_model=handle_school_selection,
                         placeholder="Type school name or DBN...",
                         clearable=True,
                         dense=True,
-                        solo=True,  # Clean borderless look
+                        solo=True,
                         hide_no_data=True,
                         auto_select_first=True,
                         prepend_inner_icon="mdi-magnify",
-                        return_object=False,   # Return just the value, not the dict
-                        style_="flex: 1; min-width: 250px;",
+                        return_object=False,
+                        style_="flex: 1; min-width: 200px; max-width: 300px;",
                     )
-                    # Close button to collapse search bar
                     solara.Button(
                         label="×",
                         on_click=lambda: (search_query.set(""), search_expanded.set(False)),
@@ -1331,11 +2252,206 @@ def Toolbar(
                         }
                     )
 
-            # ===== SPACER: Pushes everything else to the right =====
-            solara.HTML(unsafe_innerHTML="<div style='flex: 1 1 auto; min-width: 12px;'></div>")
+                # ===== SPACER: Pushes overflow menu to the right =====
+                solara.HTML(
+                    unsafe_innerHTML="<div style='flex: 1 1 auto; min-width: 8px;'></div>",
+                    classes=["header-spacer"]
+                )
 
-            # ===== RIGHT SECTION: All filters =====
-            # Geography filters group
+                # ===== OVERFLOW MENU (⋯) - INSIDE header row =====
+                # This button is visible only at tablet/mobile widths (via CSS)
+                with solara.Column(style={
+                    "position": "relative",
+                    "flex-shrink": "0",
+                }, classes=["overflow-menu-container"]):
+                    solara.Button(
+                        label="",
+                        icon_name="mdi-dots-horizontal",
+                        on_click=lambda: overflow_open.set(not overflow_open.value),
+                        style={
+                            "width": "32px",
+                            "height": "30px",
+                            "min-width": "32px",
+                            "padding": "0",
+                            "background": "#f8f9fa" if overflow_open.value else "transparent",
+                            "border": "1px solid #e5e7eb",
+                            "border-radius": "6px",
+                            "color": "#6b7280",
+                            "display": "inline-flex",
+                            "align-items": "center",
+                            "justify-content": "center",
+                        },
+                        classes=["overflow-btn"]
+                    )
+
+                    # Overflow dropdown menu (shown when overflow_open is True)
+                    if overflow_open.value:
+                        with solara.Column(style={
+                            "position": "absolute",
+                            "top": "36px",
+                            "right": "0",
+                            "background": "white",
+                            "border": "1px solid #e5e7eb",
+                            "border-radius": "8px",
+                            "box-shadow": "0 4px 12px rgba(0,0,0,0.15)",
+                            "padding": "8px",
+                            "min-width": "180px",
+                            "z-index": "9999",
+                        }, classes=["overflow-dropdown"]):
+                            # Label
+                            solara.HTML(unsafe_innerHTML='''
+                                <div style="font-size: 10px; font-weight: 600; color: #9ca3af;
+                                            text-transform: uppercase; letter-spacing: 0.5px;
+                                            padding: 4px 8px 8px; border-bottom: 1px solid #e5e7eb;">
+                                    More Filters
+                                </div>
+                            ''')
+
+                            # Superintendent dropdown - shows in overflow when toolbar version hides at 1000px
+                            with solara.Row(style={
+                                "padding": "8px",
+                                "align-items": "center",
+                                "gap": "8px",
+                            }, classes=["overflow-show-supt"]):
+                                solara.HTML(unsafe_innerHTML='<span style="font-size: 12px; color: #6b7280; min-width: 70px;">Superintendent</span>')
+                                solara.Select(
+                                    label="",
+                                    value=superintendent_filter.value,
+                                    on_value=lambda v: superintendent_filter.set(v),
+                                    values=superintendent_options,
+                                    style={"width": "100%", "flex": "1"}
+                                )
+
+                            # STH indicator toggle
+                            solara.Button(
+                                label="● STH" + (" ≥15%" if sth_active else ""),
+                                on_click=lambda: sth_filter.set(not sth_filter.value),
+                                style={
+                                    "width": "100%",
+                                    "padding": "8px 12px",
+                                    "background": "rgba(255, 100, 100, 0.1)" if sth_active else "transparent",
+                                    "border": "1px solid #ff6464" if sth_active else "1px solid #e5e7eb",
+                                    "border-radius": "6px",
+                                    "font-size": "12px",
+                                    "color": "#ff6464",
+                                    "text-align": "left",
+                                    "justify-content": "flex-start",
+                                    "margin-top": "4px",
+                                },
+                                classes=["overflow-show-at-1100"]
+                            )
+
+                            # ENI indicator toggle
+                            solara.Button(
+                                label="● ENI" + (" ≥74%" if eni_active else ""),
+                                on_click=lambda: eni_filter.set(not eni_filter.value),
+                                style={
+                                    "width": "100%",
+                                    "padding": "8px 12px",
+                                    "background": "rgba(0, 220, 220, 0.1)" if eni_active else "transparent",
+                                    "border": "1px solid #00dcdc" if eni_active else "1px solid #e5e7eb",
+                                    "border-radius": "6px",
+                                    "font-size": "12px",
+                                    "color": "#00a8a8",
+                                    "text-align": "left",
+                                    "justify-content": "flex-start",
+                                    "margin-top": "4px",
+                                },
+                                classes=["overflow-show-at-1100"]
+                            )
+
+                            # Show Gaps toggle
+                            if show_gaps is not None:
+                                gaps_active_overflow = show_gaps.value
+                                solara.Button(
+                                    label="👁 Gaps" if gaps_active_overflow else "Gaps",
+                                    on_click=lambda: show_gaps.set(not show_gaps.value),
+                                    style={
+                                        "width": "100%",
+                                        "padding": "8px 12px",
+                                        "background": "rgba(100, 100, 100, 0.15)" if gaps_active_overflow else "transparent",
+                                        "border": "1px solid #666666" if gaps_active_overflow else "1px solid #e5e7eb",
+                                        "border-radius": "6px",
+                                        "font-size": "12px",
+                                        "color": "#666666",
+                                        "text-align": "left",
+                                        "justify-content": "flex-start",
+                                        "margin-top": "4px",
+                                    },
+                                    classes=["overflow-show-at-900"]
+                                )
+
+                            # Show Offices toggle
+                            if show_offices is not None:
+                                offices_active_overflow = show_offices.value
+                                solara.Button(
+                                    label="🏢 Offices" if offices_active_overflow else "Offices",
+                                    on_click=lambda: show_offices.set(not show_offices.value),
+                                    style={
+                                        "width": "100%",
+                                        "padding": "8px 12px",
+                                        "background": "rgba(107, 114, 128, 0.15)" if offices_active_overflow else "transparent",
+                                        "border": "1px solid #6b7280" if offices_active_overflow else "1px solid #e5e7eb",
+                                        "border-radius": "6px",
+                                        "font-size": "12px",
+                                        "color": "#6b7280",
+                                        "text-align": "left",
+                                        "justify-content": "flex-start",
+                                        "margin-top": "4px",
+                                    },
+                                    classes=["overflow-show-at-600"]
+                                )
+
+                            # Divider before actions
+                            solara.HTML(unsafe_innerHTML='''
+                                <div style="height: 1px; background: #e5e7eb; margin: 8px 0;"></div>
+                            ''')
+
+                            # Reset button (mobile only)
+                            solara.Button(
+                                label="↺ Reset Filters",
+                                on_click=on_reset,
+                                style={
+                                    "width": "100%",
+                                    "padding": "8px 12px",
+                                    "background": "transparent",
+                                    "border": "1px solid #e5e7eb",
+                                    "border-radius": "6px",
+                                    "font-size": "12px",
+                                    "color": "#6b7280",
+                                    "text-align": "left",
+                                    "justify-content": "flex-start",
+                                },
+                                classes=["overflow-mobile-only"]
+                            )
+
+                            # CSV Export button (mobile only)
+                            solara.Button(
+                                label="↓ Export CSV",
+                                on_click=lambda: print("Export clicked"),
+                                style={
+                                    "width": "100%",
+                                    "padding": "8px 12px",
+                                    "background": "#6B9080",
+                                    "border": "1px solid #6B9080",
+                                    "border-radius": "6px",
+                                    "font-size": "12px",
+                                    "font-weight": "600",
+                                    "color": "white",
+                                    "text-align": "left",
+                                    "justify-content": "flex-start",
+                                    "margin-top": "4px",
+                                },
+                                classes=["overflow-mobile-only"]
+                            )
+
+            # ===== SPACER: Desktop only - pushes filters to the right =====
+            solara.HTML(
+                unsafe_innerHTML="<div style='flex: 1 1 auto; min-width: 12px;'></div>",
+                classes=["toolbar-spacer"]
+            )
+
+            # ===== ROW 2 (MOBILE): Filters Section - Geography dropdowns =====
             # Each filter resets the others when changed (prevents conflicting empty results)
             def on_borough_change(value):
                 borough_filter.set(value)
@@ -1355,349 +2471,236 @@ def Toolbar(
                     borough_filter.set("All Boroughs")
                     district_filter.set("All Districts")
 
-            solara.Select(
-                label="",
-                value=borough_filter.value,
-                on_value=on_borough_change,
-                values=["All Boroughs", "Bronx", "Brooklyn", "Manhattan", "Queens", "Staten Island"],
-                style={"width": "115px", "flex-shrink": "0"}
-            )
+            with solara.Row(
+                classes=["toolbar-filters-section"],
+                style={
+                    "display": "flex",
+                    "align-items": "center",
+                    "gap": "6px",
+                    "flex": "1 1 auto",  # Allow stretching at mobile
+                    "width": "100%",  # Take full width
+                }
+            ):
+                solara.Select(
+                    label="",
+                    value=borough_filter.value,
+                    on_value=on_borough_change,
+                    values=["All Boroughs", "Bronx", "Brooklyn", "Manhattan", "Queens", "Staten Island"],
+                    style={"min-width": "90px", "flex": "1 1 auto"}
+                )
 
-            solara.Select(
-                label="",
-                value=district_filter.value,
-                on_value=on_district_change,
-                values=["All Districts"] + [f"D{i}" for i in range(1, 33)],
-                style={"width": "95px", "flex-shrink": "0"}
-            )
+                solara.Select(
+                    label="",
+                    value=district_filter.value,
+                    on_value=on_district_change,
+                    values=["All Districts"] + [f"D{i}" for i in range(1, 33)],
+                    style={"min-width": "80px", "flex": "1 1 auto"}
+                )
 
-            # Superintendent dropdown - lower priority, hide first at 1000px
-            with solara.Column(classes=["supt-dropdown-toolbar"], style={"margin": "0", "padding": "0"}):
                 solara.Select(
                     label="",
                     value=superintendent_filter.value,
                     on_value=on_superintendent_change,
                     values=superintendent_options,
-                    style={"width": "125px", "flex-shrink": "0"}
+                    style={"min-width": "100px", "flex": "1 1 auto"},
+                    classes=["supt-dropdown"]
                 )
 
-            # Divider
-            solara.HTML(unsafe_innerHTML='<div style="width: 1px; height: 26px; background: #e0e0e0; margin: 0 8px; flex-shrink: 0;"></div>')
+            # Desktop divider between filters and toggles
+            solara.HTML(
+                unsafe_innerHTML='<div style="width: 1px; height: 26px; background: #e0e0e0; margin: 0 4px; flex-shrink: 0;"></div>',
+                classes=["toolbar-divider-desktop"]
+            )
 
-            # Layer toggles (if provided)
-            # In choropleth mode, these become mutually exclusive (radio behavior)
+            # ===== ROW 3 (MOBILE): Toggles Section - Training layers and view options =====
             is_choropleth = view_mode is not None and view_mode.value == "District Choropleth"
 
-            if fundamentals_enabled is not None:
-                fund_active = fundamentals_enabled.value
-                # Use handler if provided, otherwise direct set
-                fund_click = (
-                    lambda: on_training_toggle('fundamentals', not fundamentals_enabled.value)
-                    if on_training_toggle else lambda: fundamentals_enabled.set(not fundamentals_enabled.value)
-                )
-                solara.Button(
-                    label="🔵 Fund" if fund_active else "Fund",
-                    on_click=fund_click,
-                    style=btn_style(
-                        active=fund_active,
-                        color="#4183C4",
-                        active_bg="rgba(65, 131, 196, 0.15)",
-                        active_border="#4183C4"
-                    )
-                )
-
-            if lights_enabled is not None:
-                lights_active = lights_enabled.value
-                # Use handler if provided, otherwise direct set
-                lights_click = (
-                    lambda: on_training_toggle('lights', not lights_enabled.value)
-                    if on_training_toggle else lambda: lights_enabled.set(not lights_enabled.value)
-                )
-                solara.Button(
-                    label="🟣 LIGHTS" if lights_active else "LIGHTS",
-                    on_click=lights_click,
-                    style=btn_style(
-                        active=lights_active,
-                        color="#9C66B2",
-                        active_bg="rgba(156, 102, 178, 0.15)",
-                        active_border="#9C66B2"
-                    )
-                )
-
-            # Student Sessions placeholder (Coming Soon)
-            with solara.Tooltip("Coming Soon - Student session tracking in development"):
-                solara.Button(
-                    label="Sessions",
-                    disabled=True,
-                    style={
-                        "height": "30px",
-                        "min-height": "30px",
-                        "padding": "0 10px",
-                        "border-radius": "6px",
-                        "font-size": "12px",
-                        "font-weight": "500",
-                        "background": "#f3f4f6",
-                        "border": "1px solid #e5e7eb",
-                        "color": "#9ca3af",
-                        "cursor": "not-allowed",
-                        "opacity": "0.6",
-                        "white-space": "nowrap",
-                    }
-                )
-
-            # Divider between layers and highlights
-            if fundamentals_enabled is not None:
-                solara.HTML(unsafe_innerHTML='<div style="width: 1px; height: 26px; background: #e0e0e0; margin: 0 8px; flex-shrink: 0;"></div>')
-
-            # Indicator toggles (highlights) - lower priority, hide first at 1100px
-            solara.Button(
-                label="🔴 STH" if sth_active else "STH",
-                on_click=lambda: sth_filter.set(not sth_filter.value),
-                style=btn_style(
-                    active=sth_active,
-                    color="#ff6464",
-                    active_bg="rgba(255, 100, 100, 0.15)",
-                    active_border="#ff6464"
-                ),
-                classes=["toolbar-priority-low"]
-            )
-
-            solara.Button(
-                label="🔵 ENI" if eni_active else "ENI",
-                on_click=lambda: eni_filter.set(not eni_filter.value),
-                style=btn_style(
-                    active=eni_active,
-                    color="#00a0a0",
-                    active_bg="rgba(0, 220, 220, 0.15)",
-                    active_border="#00dcdc"
-                ),
-                classes=["toolbar-priority-low"]
-            )
-
-            # Divider before Show Gaps
-            solara.HTML(unsafe_innerHTML='<div style="width: 1px; height: 26px; background: #e0e0e0; margin: 0 8px; flex-shrink: 0;"></div>')
-
-            # Show Gaps toggle - highlights untrained schools as hollow circles
-            # Higher priority - stays visible longer (hides at 900px)
-            if show_gaps is not None:
-                gaps_active = show_gaps.value
-                solara.Button(
-                    label="👁 Gaps" if gaps_active else "Gaps",
-                    on_click=lambda: show_gaps.set(not show_gaps.value),
-                    style=btn_style(
-                        active=gaps_active,
-                        color="#666666",
-                        active_bg="rgba(100, 100, 100, 0.15)",
-                        active_border="#666666"
-                    ),
-                    classes=["toolbar-priority-high"]
-                )
-
-            # Show Offices toggle - shows 32 district superintendent offices
-            # Higher priority - stays visible longer (hides at 900px)
-            if show_offices is not None:
-                offices_active = show_offices.value
-                solara.Button(
-                    label="🏢 Offices" if offices_active else "Offices",
-                    on_click=lambda: show_offices.set(not show_offices.value),
-                    style=btn_style(
-                        active=offices_active,
-                        color="#6b7280",
-                        active_bg="rgba(107, 114, 128, 0.15)",
-                        active_border="#6b7280"
-                    ),
-                    classes=["toolbar-priority-high"]
-                )
-
-            # Divider before action buttons
-            solara.HTML(unsafe_innerHTML='<div style="width: 1px; height: 26px; background: #e0e0e0; margin: 0 8px; flex-shrink: 0;"></div>')
-
-            # Action buttons
-            solara.Button(
-                label="↺",
-                on_click=on_reset,
+            with solara.Row(
+                classes=["toolbar-toggles-section"],
                 style={
-                    "height": "30px",
-                    "width": "32px",
-                    "min-width": "32px",
-                    "padding": "0",
-                    "border-radius": "6px",
-                    "font-size": "16px",
-                    "background": "transparent",
-                    "border": "1px solid #e5e7eb",
-                    "color": "#6b7280",
-                    "display": "inline-flex",
+                    "display": "flex",
                     "align-items": "center",
-                    "justify-content": "center",
+                    "gap": "4px",
+                    "flex": "1 1 auto",  # Allow stretching at mobile
+                    "width": "100%",  # Take full width
+                }
+            ):
+                # Fundamentals toggle
+                if fundamentals_enabled is not None:
+                    fund_active = fundamentals_enabled.value
+                    fund_click = (
+                        lambda: on_training_toggle('fundamentals', not fundamentals_enabled.value)
+                        if on_training_toggle else lambda: fundamentals_enabled.set(not fundamentals_enabled.value)
+                    )
+                    solara.Button(
+                        label="🔵 Fund" if fund_active else "Fund",
+                        on_click=fund_click,
+                        style=btn_style(
+                            active=fund_active,
+                            color="#4183C4",
+                            active_bg="rgba(65, 131, 196, 0.15)",
+                            active_border="#4183C4"
+                        )
+                    )
+
+                # LIGHTS toggle
+                if lights_enabled is not None:
+                    lights_active = lights_enabled.value
+                    lights_click = (
+                        lambda: on_training_toggle('lights', not lights_enabled.value)
+                        if on_training_toggle else lambda: lights_enabled.set(not lights_enabled.value)
+                    )
+                    solara.Button(
+                        label="🟣 LIGHTS" if lights_active else "LIGHTS",
+                        on_click=lights_click,
+                        style=btn_style(
+                            active=lights_active,
+                            color="#9C66B2",
+                            active_bg="rgba(156, 102, 178, 0.15)",
+                            active_border="#9C66B2"
+                        )
+                    )
+
+                # Sessions toggle (placeholder)
+                with solara.Tooltip("Coming Soon - Student session tracking"):
+                    solara.Button(
+                        label="Sessions",
+                        disabled=True,
+                        style={
+                            "height": "30px",
+                            "min-height": "30px",
+                            "padding": "0 8px",
+                            "border-radius": "6px",
+                            "font-size": "12px",
+                            "font-weight": "500",
+                            "background": "#f3f4f6",
+                            "border": "1px solid #e5e7eb",
+                            "color": "#9ca3af",
+                            "cursor": "not-allowed",
+                            "opacity": "0.6",
+                            "white-space": "nowrap",
+                        }
+                    )
+
+                # Gaps toggle
+                if show_gaps is not None:
+                    gaps_active = show_gaps.value
+                    solara.Button(
+                        label="👁 Gaps" if gaps_active else "Gaps",
+                        on_click=lambda: show_gaps.set(not show_gaps.value),
+                        style=btn_style(
+                            active=gaps_active,
+                            color="#666666",
+                            active_bg="rgba(100, 100, 100, 0.15)",
+                            active_border="#666666"
+                        )
+                    )
+
+                # Offices toggle
+                if show_offices is not None:
+                    offices_active = show_offices.value
+                    solara.Button(
+                        label="🏢 Offices" if offices_active else "Offices",
+                        on_click=lambda: show_offices.set(not show_offices.value),
+                        style=btn_style(
+                            active=offices_active,
+                            color="#6b7280",
+                            active_bg="rgba(107, 114, 128, 0.15)",
+                            active_border="#6b7280"
+                        ),
+                        classes=["offices-btn"]
+                    )
+
+            # ===== DESKTOP ONLY: Vulnerability indicators and actions =====
+            # These move to overflow menu on tablet/mobile (hidden via CSS class at ≤1200px)
+            # Each element has .desktop-only class for individual hiding
+            with solara.Row(
+                classes=["toolbar-indicators-section"],
+                style={
+                    "align-items": "center",
+                    "gap": "4px",
                     "flex-shrink": "0",
                 }
-            )
-
-            solara.Button(
-                label="↓ CSV",
-                on_click=lambda: print("Export clicked"),
-                style={
-                    "height": "30px",
-                    "padding": "0 12px",
-                    "border-radius": "6px",
-                    "font-size": "12px",
-                    "font-weight": "600",
-                    "background": "#6B9080",
-                    "border": "1px solid #6B9080",
-                    "color": "white",
-                    "white-space": "nowrap",
-                    "display": "inline-flex",
-                    "align-items": "center",
-                    "justify-content": "center",
-                    "flex-shrink": "0",
-                },
-                classes=["export-btn"]
-            )
-
-            # ===== OVERFLOW MENU (⋯) - shows hidden items at narrow widths =====
-            # This button is visible only when items overflow (via CSS)
-            with solara.Column(style={
-                "position": "relative",
-                "flex-shrink": "0",
-            }, classes=["overflow-menu-container"]):
-                solara.Button(
-                    label="",
-                    icon_name="mdi-dots-horizontal",
-                    on_click=lambda: overflow_open.set(not overflow_open.value),
-                    style={
-                        "width": "32px",
-                        "height": "30px",
-                        "min-width": "32px",
-                        "padding": "0",
-                        "background": "#f8f9fa" if overflow_open.value else "transparent",
-                        "border": "1px solid #e5e7eb",
-                        "border-radius": "6px",
-                        "color": "#6b7280",
-                        "display": "inline-flex",
-                        "align-items": "center",
-                        "justify-content": "center",
-                    },
-                    classes=["overflow-btn"]
+            ):
+                # Divider
+                solara.HTML(
+                    unsafe_innerHTML='<div style="width: 1px; height: 26px; background: #e0e0e0; margin: 0 4px; flex-shrink: 0;"></div>',
+                    classes=["desktop-only"]
                 )
 
-                # Overflow dropdown menu (shown when overflow_open is True)
-                if overflow_open.value:
-                    with solara.Column(style={
-                        "position": "absolute",
-                        "top": "36px",
-                        "right": "0",
-                        "background": "white",
+                # STH toggle
+                solara.Button(
+                    label="🔴 STH" if sth_active else "STH",
+                    on_click=lambda: sth_filter.set(not sth_filter.value),
+                    style=btn_style(
+                        active=sth_active,
+                        color="#ff6464",
+                        active_bg="rgba(255, 100, 100, 0.15)",
+                        active_border="#ff6464"
+                    ),
+                    classes=["desktop-only"]
+                )
+
+                # ENI toggle
+                solara.Button(
+                    label="🔵 ENI" if eni_active else "ENI",
+                    on_click=lambda: eni_filter.set(not eni_filter.value),
+                    style=btn_style(
+                        active=eni_active,
+                        color="#00a0a0",
+                        active_bg="rgba(0, 220, 220, 0.15)",
+                        active_border="#00dcdc"
+                    ),
+                    classes=["desktop-only"]
+                )
+
+                # Divider
+                solara.HTML(
+                    unsafe_innerHTML='<div style="width: 1px; height: 26px; background: #e0e0e0; margin: 0 4px; flex-shrink: 0;"></div>',
+                    classes=["desktop-only"]
+                )
+
+                # Reset button
+                solara.Button(
+                    label="↺",
+                    on_click=on_reset,
+                    style={
+                        "height": "30px",
+                        "width": "32px",
+                        "min-width": "32px",
+                        "padding": "0",
+                        "border-radius": "6px",
+                        "font-size": "16px",
+                        "background": "transparent",
                         "border": "1px solid #e5e7eb",
-                        "border-radius": "8px",
-                        "box-shadow": "0 4px 12px rgba(0,0,0,0.15)",
-                        "padding": "8px",
-                        "min-width": "180px",
-                        "z-index": "9999",
-                    }, classes=["overflow-dropdown"]):
-                        # Label
-                        solara.HTML(unsafe_innerHTML='''
-                            <div style="font-size: 10px; font-weight: 600; color: #9ca3af;
-                                        text-transform: uppercase; letter-spacing: 0.5px;
-                                        padding: 4px 8px 8px; border-bottom: 1px solid #e5e7eb;">
-                                More Filters
-                            </div>
-                        ''')
+                        "color": "#6b7280",
+                        "align-items": "center",
+                        "justify-content": "center",
+                        "flex-shrink": "0",
+                    },
+                    classes=["desktop-only"]
+                )
 
-                        # Superintendent dropdown - shows in overflow when toolbar version hides at 1000px
-                        with solara.Row(style={
-                            "padding": "8px",
-                            "align-items": "center",
-                            "gap": "8px",
-                        }, classes=["overflow-show-supt"]):
-                            solara.HTML(unsafe_innerHTML='<span style="font-size: 12px; color: #6b7280; min-width: 70px;">Superintendent</span>')
-                            solara.Select(
-                                label="",
-                                value=superintendent_filter.value,
-                                on_value=on_superintendent_change,
-                                values=superintendent_options,
-                                style={"width": "100%", "flex": "1"}
-                            )
-
-                        # STH indicator toggle - shows in overflow when toolbar version hides at 1100px
-                        solara.Button(
-                            label="● STH" + (" ≥15%" if sth_active else ""),
-                            on_click=lambda: sth_filter.set(not sth_filter.value),
-                            style={
-                                "width": "100%",
-                                "padding": "8px 12px",
-                                "background": "rgba(255, 100, 100, 0.1)" if sth_active else "transparent",
-                                "border": "1px solid #ff6464" if sth_active else "1px solid #e5e7eb",
-                                "border-radius": "6px",
-                                "font-size": "12px",
-                                "color": "#ff6464",
-                                "text-align": "left",
-                                "justify-content": "flex-start",
-                                "margin-top": "4px",
-                            },
-                            classes=["overflow-show-at-1100"]
-                        )
-
-                        # ENI indicator toggle - shows in overflow when toolbar version hides at 1100px
-                        solara.Button(
-                            label="● ENI" + (" ≥74%" if eni_active else ""),
-                            on_click=lambda: eni_filter.set(not eni_filter.value),
-                            style={
-                                "width": "100%",
-                                "padding": "8px 12px",
-                                "background": "rgba(0, 220, 220, 0.1)" if eni_active else "transparent",
-                                "border": "1px solid #00dcdc" if eni_active else "1px solid #e5e7eb",
-                                "border-radius": "6px",
-                                "font-size": "12px",
-                                "color": "#00a8a8",
-                                "text-align": "left",
-                                "justify-content": "flex-start",
-                                "margin-top": "4px",
-                            },
-                            classes=["overflow-show-at-1100"]
-                        )
-
-                        # Show Gaps toggle - shows in overflow when toolbar version hides at 900px
-                        if show_gaps is not None:
-                            gaps_active = show_gaps.value
-                            solara.Button(
-                                label="👁 Gaps" if gaps_active else "Gaps",
-                                on_click=lambda: show_gaps.set(not show_gaps.value),
-                                style={
-                                    "width": "100%",
-                                    "padding": "8px 12px",
-                                    "background": "rgba(100, 100, 100, 0.15)" if gaps_active else "transparent",
-                                    "border": "1px solid #666666" if gaps_active else "1px solid #e5e7eb",
-                                    "border-radius": "6px",
-                                    "font-size": "12px",
-                                    "color": "#666666",
-                                    "text-align": "left",
-                                    "justify-content": "flex-start",
-                                    "margin-top": "4px",
-                                },
-                                classes=["overflow-show-at-900"]
-                            )
-
-                        # Show Offices toggle - shows in overflow when toolbar version hides at 900px
-                        if show_offices is not None:
-                            offices_active = show_offices.value
-                            solara.Button(
-                                label="🏢 Offices" if offices_active else "Offices",
-                                on_click=lambda: show_offices.set(not show_offices.value),
-                                style={
-                                    "width": "100%",
-                                    "padding": "8px 12px",
-                                    "background": "rgba(107, 114, 128, 0.15)" if offices_active else "transparent",
-                                    "border": "1px solid #6b7280" if offices_active else "1px solid #e5e7eb",
-                                    "border-radius": "6px",
-                                    "font-size": "12px",
-                                    "color": "#6b7280",
-                                    "text-align": "left",
-                                    "justify-content": "flex-start",
-                                    "margin-top": "4px",
-                                },
-                                classes=["overflow-show-at-900"]
-                            )
-
+                # CSV Export button
+                solara.Button(
+                    label="↓ CSV",
+                    on_click=lambda: print("Export clicked"),
+                    style={
+                        "height": "30px",
+                        "padding": "0 12px",
+                        "border-radius": "6px",
+                        "font-size": "12px",
+                        "font-weight": "600",
+                        "background": "#6B9080",
+                        "border": "1px solid #6B9080",
+                        "color": "white",
+                        "white-space": "nowrap",
+                        "align-items": "center",
+                        "justify-content": "center",
+                        "flex-shrink": "0",
+                    },
+                    classes=["export-btn", "desktop-only"]
+                )
 
 # ============================================================================
 # LAYER CONTROLS COMPONENT
@@ -1803,94 +2806,134 @@ def OverviewSidebar(
     # Entity counts for display
     school_count = stats.get('school_count', stats['total'])
     office_count = stats.get('office_count', 0)
+    trained_count = stats.get('trained_count', 0)
+    trained_pct = stats.get('trained_pct', 0)
 
-    # Build count display text
+    # Build count display - trained count with context
     if show_offices and office_count > 0:
-        count_display = f"{school_count:,} <span style='font-size: 11px; color: #6b7280;'>schools</span> <span style='font-size: 11px; color: #9ca3af;'>+ {office_count} offices</span>"
+        total_context = f"of {school_count:,} total + {office_count} offices"
     else:
-        count_display = f"{school_count:,} <span style='font-size: 11px; color: #6b7280; margin-left: 4px;'>schools</span>"
+        total_context = f"of {school_count:,} total"
 
     # Sidebar content
     with solara.Column(style={"padding": "16px", "height": "calc(100vh - 56px)", "overflow-y": "auto", "background": "#ffffff", "gap": "0px"}):
 
-        # Training Coverage Section with Progress Bars
+        # Training Coverage Section with Progress Bars - Improved alignment
         solara.HTML(unsafe_innerHTML=f"""
-            <div style="background: #f9fafb; border-radius: 8px; padding: 16px; margin-bottom: 20px;">
-                <!-- Header with total -->
-                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px;">
-                    <div style="font-size: 11px; font-weight: 600; color: #9ca3af; text-transform: uppercase; letter-spacing: 0.5px;">
+            <div style="background: #f9fafb; border-radius: 8px; padding: 14px 16px; margin-bottom: 16px;">
+                <!-- Header row: label left, stats right -->
+                <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 14px;">
+                    <div style="font-size: 10px; font-weight: 600; color: #9ca3af; text-transform: uppercase; letter-spacing: 0.5px; padding-top: 4px;">
                         Training Coverage
                     </div>
-                    <div style="text-align: right;">
-                        <span style="font-size: 20px; font-weight: 700; color: #262730;">{count_display}</span>
+                    <div style="text-align: right; line-height: 1.3;">
+                        <div style="font-size: 22px; font-weight: 700; color: #262730; font-variant-numeric: tabular-nums;">{trained_count:,}</div>
+                        <div style="font-size: 11px; color: #6b7280;">schools trained</div>
+                        <div style="font-size: 10px; color: #9ca3af;">({total_context})</div>
                     </div>
                 </div>
 
-                <!-- Fundamentals Progress Bar -->
-                <div style="margin-bottom: 14px;">
-                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">
-                        <span style="font-size: 12px; font-weight: 500; color: #374151;">
-                            <span style="color: #4183C4;">●</span> Fundamentals
-                        </span>
-                        <span style="font-size: 12px; color: #6b7280;">
-                            {fund_count:,} <span style="color: #9ca3af;">({fund_pct}%)</span>
-                        </span>
+                <!-- Progress bars with consistent spacing and aligned numbers -->
+                <div style="display: flex; flex-direction: column; gap: 10px;">
+                    <!-- Fundamentals -->
+                    <div>
+                        <div style="display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 4px;">
+                            <span style="font-size: 12px; font-weight: 500; color: #374151; display: flex; align-items: center; gap: 6px;">
+                                <span style="color: #4183C4; font-size: 8px;">●</span> Fundamentals
+                            </span>
+                            <span style="font-size: 12px; color: #374151; font-variant-numeric: tabular-nums; min-width: 85px; text-align: right;">
+                                {fund_count:,} <span style="color: #9ca3af;">({fund_pct}%)</span>
+                            </span>
+                        </div>
+                        <div style="height: 6px; background: #e5e7eb; border-radius: 3px; overflow: hidden;">
+                            <div style="height: 100%; width: {fund_pct}%; background: #4183C4; border-radius: 3px;"></div>
+                        </div>
                     </div>
-                    <div style="height: 8px; background: #e5e7eb; border-radius: 4px; overflow: hidden;">
-                        <div style="height: 100%; width: {fund_pct}%; background: #4183C4; border-radius: 4px; transition: width 0.3s;"></div>
-                    </div>
-                </div>
 
-                <!-- LIGHTS Progress Bar -->
-                <div style="margin-bottom: 14px;">
-                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">
-                        <span style="font-size: 12px; font-weight: 500; color: #374151;">
-                            <span style="color: #9C66B2;">●</span> LIGHTS ToT
-                        </span>
-                        <span style="font-size: 12px; color: #6b7280;">
-                            {lights_count:,} <span style="color: #9ca3af;">({lights_pct}%)</span>
-                        </span>
+                    <!-- LIGHTS ToT -->
+                    <div>
+                        <div style="display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 4px;">
+                            <span style="font-size: 12px; font-weight: 500; color: #374151; display: flex; align-items: center; gap: 6px;">
+                                <span style="color: #9C66B2; font-size: 8px;">●</span> LIGHTS ToT
+                            </span>
+                            <span style="font-size: 12px; color: #374151; font-variant-numeric: tabular-nums; min-width: 85px; text-align: right;">
+                                {lights_count:,} <span style="color: #9ca3af;">({lights_pct}%)</span>
+                            </span>
+                        </div>
+                        <div style="height: 6px; background: #e5e7eb; border-radius: 3px; overflow: hidden;">
+                            <div style="height: 100%; width: {lights_pct}%; background: #9C66B2; border-radius: 3px;"></div>
+                        </div>
                     </div>
-                    <div style="height: 8px; background: #e5e7eb; border-radius: 4px; overflow: hidden;">
-                        <div style="height: 100%; width: {lights_pct}%; background: #9C66B2; border-radius: 4px; transition: width 0.3s;"></div>
-                    </div>
-                </div>
 
-                <!-- Student Sessions Progress Bar -->
-                <div>
-                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">
-                        <span style="font-size: 12px; font-weight: 500; color: #374151;">
-                            <span style="color: #4CAF93;">●</span> Student Sessions
-                        </span>
-                        <span style="font-size: 12px; color: #6b7280;">
-                            {students_count:,} <span style="color: #9ca3af;">({students_pct}%)</span>
-                        </span>
-                    </div>
-                    <div style="height: 8px; background: #e5e7eb; border-radius: 4px; overflow: hidden;">
-                        <div style="height: 100%; width: {students_pct}%; background: #4CAF93; border-radius: 4px; transition: width 0.3s;"></div>
+                    <!-- Student Sessions -->
+                    <div>
+                        <div style="display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 4px;">
+                            <span style="font-size: 12px; font-weight: 500; color: #374151; display: flex; align-items: center; gap: 6px;">
+                                <span style="color: #4CAF93; font-size: 8px;">●</span> Student Sessions
+                            </span>
+                            <span style="font-size: 12px; color: #374151; font-variant-numeric: tabular-nums; min-width: 85px; text-align: right;">
+                                {students_count:,} <span style="color: #9ca3af;">({students_pct}%)</span>
+                            </span>
+                        </div>
+                        <div style="height: 6px; background: #e5e7eb; border-radius: 3px; overflow: hidden;">
+                            <div style="height: 100%; width: {students_pct}%; background: #4CAF93; border-radius: 3px;"></div>
+                        </div>
                     </div>
                 </div>
             </div>
 
-            <!-- Vulnerability Summary -->
-            <div style="background: #f9fafb; border-radius: 8px; padding: 16px; margin-bottom: 20px;">
-                <div style="font-size: 11px; font-weight: 600; color: #9ca3af; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 12px;">
+            <!-- Training Gaps Overview -->
+            <div style="background: #f9fafb; border-radius: 8px; padding: 14px 16px; margin-bottom: 16px;">
+                <div style="font-size: 10px; font-weight: 600; color: #9ca3af; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 10px;">
+                    Training Gaps
+                </div>
+                <div style="display: flex; flex-direction: column; gap: 8px;">
+                    <!-- Untouched Schools -->
+                    <div style="display: flex; justify-content: space-between; align-items: baseline;" title="Schools with no training of any kind">
+                        <span style="font-size: 11px; color: #374151; display: flex; align-items: center; gap: 6px;">
+                            <span style="color: #B87D7D; font-size: 8px;">●</span> Untouched
+                        </span>
+                        <span style="font-size: 14px; font-weight: 600; color: #B87D7D; font-variant-numeric: tabular-nums;">{stats.get('no_training', 0):,}</span>
+                    </div>
+                    <!-- Need LIGHTS -->
+                    <div style="display: flex; justify-content: space-between; align-items: baseline;" title="Schools with Fundamentals but no LIGHTS ToT">
+                        <span style="font-size: 11px; color: #374151; display: flex; align-items: center; gap: 6px;">
+                            <span style="color: #F59E0B; font-size: 8px;">●</span> Need LIGHTS
+                        </span>
+                        <span style="font-size: 14px; font-weight: 600; color: #F59E0B; font-variant-numeric: tabular-nums;">{stats.get('need_lights_count', 0):,}</span>
+                    </div>
+                    <!-- Sessions Submitted (of LIGHTS schools) -->
+                    <div style="display: flex; justify-content: space-between; align-items: baseline;" title="LIGHTS schools that have submitted student session data">
+                        <span style="font-size: 11px; color: #374151; display: flex; align-items: center; gap: 6px;">
+                            <span style="color: #4CAF93; font-size: 8px;">●</span> Sessions Submitted
+                        </span>
+                        <span style="text-align: right; font-variant-numeric: tabular-nums;">
+                            <span style="font-size: 14px; font-weight: 600; color: #4CAF93;">{round(students_count / lights_count * 100) if lights_count > 0 else 0}%</span>
+                            <span style="color: #9ca3af; font-size: 10px;"> ({students_count} of {lights_count})</span>
+                        </span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- High-Need Schools Summary -->
+            <div style="background: #f9fafb; border-radius: 8px; padding: 14px 16px; margin-bottom: 16px;">
+                <div style="font-size: 10px; font-weight: 600; color: #9ca3af; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 10px;">
                     High-Need Schools
                 </div>
-                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px;">
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px;">
                     <div title="Students in Temporary Housing ≥15% - Top ~30% for housing instability">
-                        <div style="font-size: 24px; font-weight: 700; color: #8B5CF6;">{stats.get('high_sth', 0):,}</div>
-                        <div style="font-size: 11px; color: #6b7280;">High STH (≥15%)</div>
+                        <div style="font-size: 22px; font-weight: 700; color: #8B5CF6; font-variant-numeric: tabular-nums; line-height: 1.2;">{stats.get('high_sth', 0):,}</div>
+                        <div style="font-size: 10px; color: #6b7280;">High STH (≥15%)</div>
                     </div>
                     <div title="Economic Need Index ≥74% - DOE's 'skewed toward lower incomes' cutoff">
-                        <div style="font-size: 24px; font-weight: 700; color: #0D9488;">{stats.get('high_eni', 0):,}</div>
-                        <div style="font-size: 11px; color: #6b7280;">High ENI (≥74%)</div>
+                        <div style="font-size: 22px; font-weight: 700; color: #0D9488; font-variant-numeric: tabular-nums; line-height: 1.2;">{stats.get('high_eni', 0):,}</div>
+                        <div style="font-size: 10px; color: #6b7280;">High ENI (≥74%)</div>
                     </div>
                 </div>
-                <div style="margin-top: 12px; padding-top: 12px; border-top: 1px solid #e5e7eb;">
-                    <div style="display: flex; justify-content: space-between; align-items: center;">
-                        <span style="font-size: 12px; color: #374151;">Priority (High-Need + Untrained)</span>
-                        <span style="font-size: 16px; font-weight: 600; color: #DC2626;">{stats.get('priority', 0):,}</span>
+                <div style="margin-top: 10px; padding-top: 10px; border-top: 1px solid #e5e7eb;">
+                    <div style="display: flex; justify-content: space-between; align-items: baseline;">
+                        <span style="font-size: 11px; color: #374151;">Priority (High-Need + Untrained)</span>
+                        <span style="font-size: 16px; font-weight: 700; color: #DC2626; font-variant-numeric: tabular-nums;">{stats.get('priority', 0):,}</span>
                     </div>
                 </div>
             </div>
@@ -2068,55 +3111,71 @@ def ClusterSidebar(
                     "width": "fit-content",
                 }
             )
-            # Cluster title and info
+            # Cluster title and info - show trained schools with total as context
+            trained_count = stats.get('trained_count', 0)
             solara.HTML(unsafe_innerHTML=f"""
                 <h2 style="margin: 0; font-size: 16px; font-weight: 600; color: #262730;">
                     📍 {cluster_label}
                 </h2>
                 <p style="margin: 4px 0 0 0; font-size: 12px; color: #6b7280;">
-                    {total:,} schools
+                    {trained_count:,} schools trained <span style="color: #9ca3af;">(of {total:,} total)</span>
                 </p>
             """)
 
         # Scrollable content (min-height: 0 is critical for flex children to allow overflow)
         with solara.Column(style={"flex": "1", "overflow-y": "auto", "padding": "16px", "min-height": "0"}):
-            # Training coverage with comparison tooltips
+            # Training coverage with comparison tooltips - Improved alignment
             solara.HTML(unsafe_innerHTML=f"""
-                <div style="background: #f9fafb; border-radius: 8px; padding: 14px; margin-bottom: 16px;">
-                    <div style="font-size: 11px; font-weight: 600; color: #9ca3af; text-transform: uppercase; margin-bottom: 10px;">
+                <div style="background: #f9fafb; border-radius: 8px; padding: 14px 16px; margin-bottom: 16px;">
+                    <div style="font-size: 10px; font-weight: 600; color: #9ca3af; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 10px;">
                         Training Coverage
                     </div>
 
-                    <!-- Fundamentals Progress Bar -->
-                    <div style="margin-bottom: 10px;" title="Citywide: {city_fund_pct}%">
-                        <div style="display: flex; justify-content: space-between; font-size: 12px; margin-bottom: 4px;">
-                            <span style="color: #374151;"><span style="color: #4183C4;">●</span> Fundamentals</span>
-                            <span style="color: #6b7280;">{fund_count} <span style="color: #9ca3af;">({fund_pct}%)</span></span>
+                    <!-- Progress bars with consistent spacing and aligned numbers -->
+                    <div style="display: flex; flex-direction: column; gap: 10px;">
+                        <!-- Fundamentals -->
+                        <div title="Citywide: {city_fund_pct}%">
+                            <div style="display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 4px;">
+                                <span style="font-size: 12px; font-weight: 500; color: #374151; display: flex; align-items: center; gap: 6px;">
+                                    <span style="color: #4183C4; font-size: 8px;">●</span> Fundamentals
+                                </span>
+                                <span style="font-size: 12px; color: #374151; font-variant-numeric: tabular-nums; min-width: 85px; text-align: right;">
+                                    {fund_count:,} <span style="color: #9ca3af;">({fund_pct}%)</span>
+                                </span>
+                            </div>
+                            <div style="height: 6px; background: #e5e7eb; border-radius: 3px; overflow: hidden;">
+                                <div style="height: 100%; width: {fund_pct}%; background: #4183C4; border-radius: 3px;"></div>
+                            </div>
                         </div>
-                        <div style="height: 8px; background: #e5e7eb; border-radius: 4px; overflow: hidden;">
-                            <div style="height: 100%; width: {fund_pct}%; background: #4183C4; transition: width 0.3s;"></div>
-                        </div>
-                    </div>
 
-                    <!-- LIGHTS Progress Bar -->
-                    <div style="margin-bottom: 10px;" title="Citywide: {city_lights_pct}%">
-                        <div style="display: flex; justify-content: space-between; font-size: 12px; margin-bottom: 4px;">
-                            <span style="color: #374151;"><span style="color: #9C66B2;">●</span> LIGHTS ToT</span>
-                            <span style="color: #6b7280;">{lights_count} <span style="color: #9ca3af;">({lights_pct}%)</span></span>
+                        <!-- LIGHTS ToT -->
+                        <div title="Citywide: {city_lights_pct}%">
+                            <div style="display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 4px;">
+                                <span style="font-size: 12px; font-weight: 500; color: #374151; display: flex; align-items: center; gap: 6px;">
+                                    <span style="color: #9C66B2; font-size: 8px;">●</span> LIGHTS ToT
+                                </span>
+                                <span style="font-size: 12px; color: #374151; font-variant-numeric: tabular-nums; min-width: 85px; text-align: right;">
+                                    {lights_count:,} <span style="color: #9ca3af;">({lights_pct}%)</span>
+                                </span>
+                            </div>
+                            <div style="height: 6px; background: #e5e7eb; border-radius: 3px; overflow: hidden;">
+                                <div style="height: 100%; width: {lights_pct}%; background: #9C66B2; border-radius: 3px;"></div>
+                            </div>
                         </div>
-                        <div style="height: 8px; background: #e5e7eb; border-radius: 4px; overflow: hidden;">
-                            <div style="height: 100%; width: {lights_pct}%; background: #9C66B2; transition: width 0.3s;"></div>
-                        </div>
-                    </div>
 
-                    <!-- Student Sessions Progress Bar -->
-                    <div title="Student session tracking coming soon">
-                        <div style="display: flex; justify-content: space-between; font-size: 12px; margin-bottom: 4px;">
-                            <span style="color: #9ca3af;"><span style="color: #9ca3af;">●</span> Student Sessions</span>
-                            <span style="font-size: 10px; padding: 1px 6px; background: #F3F4F6; border-radius: 8px; color: #6b7280;">Coming Soon</span>
-                        </div>
-                        <div style="height: 8px; background: #f3f4f6; border-radius: 4px; overflow: hidden;">
-                            <div style="height: 100%; width: 0%; background: #4CAF93;"></div>
+                        <!-- Student Sessions -->
+                        <div title="Citywide: {city_students_pct}%">
+                            <div style="display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 4px;">
+                                <span style="font-size: 12px; font-weight: 500; color: #374151; display: flex; align-items: center; gap: 6px;">
+                                    <span style="color: #4CAF93; font-size: 8px;">●</span> Student Sessions
+                                </span>
+                                <span style="font-size: 12px; color: #374151; font-variant-numeric: tabular-nums; min-width: 85px; text-align: right;">
+                                    {students_count:,} <span style="color: #9ca3af;">({students_pct}%)</span>
+                                </span>
+                            </div>
+                            <div style="height: 6px; background: #e5e7eb; border-radius: 3px; overflow: hidden;">
+                                <div style="height: 100%; width: {students_pct}%; background: #4CAF93; border-radius: 3px;"></div>
+                            </div>
                         </div>
                     </div>
 
@@ -2454,7 +3513,7 @@ def SchoolSidebar(
 
     level_colors = {'high': '#DC2626', 'moderate': '#F59E0B', 'low': '#22C55E'}
 
-    with solara.Column(style={"height": "calc(100vh - 56px)", "overflow": "hidden", "background": "#ffffff"}):
+    with solara.Column(style={"height": "calc(100vh - 56px)", "overflow": "hidden", "background": "#ffffff"}, classes=["school-sidebar-container"]):
         # Header with functional back button
         with solara.Column(style={"padding": "12px 16px", "border-bottom": "1px solid #e5e7eb", "gap": "8px"}):
             # Functional back button (visible and clickable)
@@ -2558,7 +3617,7 @@ def SchoolSidebar(
                 )
 
         # Tab content (Phase 4.2/4.3 - tables and improved styling)
-        with solara.Column(style={"flex": "1", "overflow-y": "auto", "padding": "16px"}):
+        with solara.Column(style={"flex": "1", "overflow-y": "auto", "padding": "16px"}, classes=["school-sidebar-tab-content"]):
             if active_tab == "Fundamentals":
                 # Table header is built into the table, just render it
                 solara.HTML(unsafe_innerHTML=f"""{fund_html}""")
@@ -4284,17 +5343,50 @@ def SchoolMap(
     # Create zoom control element (topleft to avoid overlapping with legend in topright)
     zoom_control = ipyleaflet.ZoomControl.element(position='topleft')
 
+    # ==========================================================================
+    # HOME BUTTON CONTROL - Resets map to default NYC view
+    # ==========================================================================
+    # Uses ipywidgets.Button wrapped in WidgetControl to integrate with Leaflet's
+    # control system. Positioned at topleft, below the zoom control.
+    # ==========================================================================
+    def create_home_control():
+        """Factory for home button control - created once, reused."""
+        home_btn = ipywidgets.Button(
+            description='',
+            icon='home',
+            tooltip='Reset to NYC view',
+            layout=ipywidgets.Layout(width='30px', height='30px', padding='0')
+        )
+        home_btn.style.button_color = 'white'
+        home_btn.style.font_weight = 'bold'
+
+        def on_home_click(b):
+            map_center.set((40.7128, -73.89))  # NYC 5-borough center
+            map_zoom.set(11)  # Default zoom level
+
+        home_btn.on_click(on_home_click)
+
+        control = ipyleaflet.WidgetControl(
+            widget=home_btn,
+            position='topleft'  # Same position as zoom - Leaflet stacks them vertically
+        )
+        return control
+
+    home_control = solara.use_memo(create_home_control, dependencies=[])
+
     # Create the Map using .element() for proper Solara reactive binding
     # on_center and on_zoom enable two-way binding - updates flow both directions
+    # NOTE: zoom_control=False disables the default zoom control - we add our own explicitly
     map_element = ipyleaflet.Map.element(
         center=map_center.value,
         on_center=map_center.set,
         zoom=map_zoom.value,
         on_zoom=map_zoom.set,
         scroll_wheel_zoom=True,
+        zoom_control=False,  # Disable default - we add our own in controls list
         layout=Layout(width='100%', height='calc(100vh - 56px)'),
         layers=all_layers,
-        controls=[zoom_control, legend_control],
+        controls=[zoom_control, home_control, legend_control],
     )
 
     # ==========================================================================
@@ -4304,7 +5396,7 @@ def SchoolMap(
     # which places it in Leaflet's protected control container, avoiding clipping.
     # ==========================================================================
     with solara.Column(style={"position": "relative", "width": "100%", "height": "100%"}):
-        # The map element (includes legend_control via controls parameter)
+        # The map element (includes zoom, home, and legend controls via controls parameter)
         map_element
 
         # View toggle overlay - positioned bottom-left (only if callback provided)
@@ -4337,6 +5429,212 @@ def SchoolMap(
 
 
 # ============================================================================
+# LOGIN COMPONENT (for password-protected access)
+# ============================================================================
+
+# Session-level authentication state (persists across page renders)
+_authenticated = solara.reactive(False)
+_auth_error = solara.reactive("")
+_is_logging_in = solara.reactive(False)  # Loading state between login and dashboard
+
+
+@solara.component
+def LoadingScreen():
+    """
+    Elegant loading screen shown while dashboard initializes after login.
+    Features a pulsing animation and auto-transitions to dashboard.
+    """
+    import threading
+
+    # Track if transition has been scheduled
+    transition_scheduled, set_transition_scheduled = solara.use_state(False)
+
+    # Schedule transition to dashboard after a brief loading period
+    def schedule_transition():
+        if not transition_scheduled:
+            set_transition_scheduled(True)
+
+            def delayed_transition():
+                import time
+                time.sleep(2.5)  # Show loading for 2.5 seconds
+                _is_logging_in.set(False)  # This triggers re-render to show dashboard
+
+            t = threading.Thread(target=delayed_transition, daemon=True)
+            t.start()
+
+    # Schedule transition on mount
+    solara.use_effect(schedule_transition, [])
+
+    with solara.Column(
+        style={
+            "min-height": "100vh",
+            "background": "linear-gradient(135deg, #667eea 0%, #764ba2 100%)",
+            "display": "flex",
+            "align-items": "center",
+            "justify-content": "center",
+            "padding": "20px",
+        }
+    ):
+        with solara.Column(
+            style={
+                "text-align": "center",
+                "color": "white",
+            }
+        ):
+            # Animated logo
+            solara.HTML(tag="div", unsafe_innerHTML="""
+                <style>
+                    @keyframes pulse {
+                        0%, 100% { transform: scale(1); opacity: 1; }
+                        50% { transform: scale(1.1); opacity: 0.8; }
+                    }
+                    @keyframes spin {
+                        from { transform: rotate(0deg); }
+                        to { transform: rotate(360deg); }
+                    }
+                    .loading-logo {
+                        font-size: 64px;
+                        animation: pulse 2s ease-in-out infinite;
+                        margin-bottom: 24px;
+                    }
+                    .loading-spinner {
+                        width: 40px;
+                        height: 40px;
+                        border: 3px solid rgba(255,255,255,0.3);
+                        border-top: 3px solid white;
+                        border-radius: 50%;
+                        animation: spin 1s linear infinite;
+                        margin: 0 auto 24px auto;
+                    }
+                    .loading-title {
+                        font-size: 24px;
+                        font-weight: 600;
+                        margin-bottom: 8px;
+                        color: white;
+                    }
+                    .loading-subtitle {
+                        font-size: 14px;
+                        color: rgba(255,255,255,0.8);
+                        margin-bottom: 32px;
+                    }
+                    .loading-message {
+                        font-size: 14px;
+                        color: rgba(255,255,255,0.9);
+                        min-height: 20px;
+                    }
+                    @keyframes fadeInOut {
+                        0%, 100% { opacity: 0.6; }
+                        50% { opacity: 1; }
+                    }
+                    .loading-dots {
+                        display: inline-block;
+                        animation: fadeInOut 1.5s ease-in-out infinite;
+                    }
+                </style>
+                <div class="loading-logo">🗺️</div>
+                <div class="loading-spinner"></div>
+                <div class="loading-title">HTYPE Geographic Dashboard</div>
+                <div class="loading-subtitle">NYC Human Trafficking Prevention Education</div>
+                <div class="loading-message">Loading dashboard<span class="loading-dots">...</span></div>
+            """)
+
+
+@solara.component
+def LoginPage():
+    """
+    Simple login page with password field.
+    Shows when DASHBOARD_PASSWORD is set and user is not authenticated.
+    """
+    password_input, set_password_input = solara.use_state("")
+    is_submitting, set_is_submitting = solara.use_state(False)
+
+    def do_login():
+        """Perform login check and update auth state."""
+        if is_submitting:
+            return  # Prevent double-submit
+
+        set_is_submitting(True)
+        logger.info(f"Login attempt with password length: {len(password_input)}")
+
+        if password_input == DASHBOARD_PASSWORD:
+            logger.info("Login successful")
+            _auth_error.set("")
+            _is_logging_in.set(True)  # Show loading screen
+            _authenticated.set(True)  # Trigger dashboard load
+        else:
+            logger.info("Login failed - incorrect password")
+            _auth_error.set("Incorrect password. Please try again.")
+            set_password_input("")
+            set_is_submitting(False)
+
+    # Outer container with gradient background
+    with solara.Column(
+        style={
+            "min-height": "100vh",
+            "background": "linear-gradient(135deg, #667eea 0%, #764ba2 100%)",
+            "display": "flex",
+            "align-items": "center",
+            "justify-content": "center",
+            "padding": "20px",
+        }
+    ):
+        # Login card
+        with solara.Card(
+            style={
+                "max-width": "400px",
+                "width": "100%",
+                "padding": "40px",
+                "border-radius": "12px",
+                "text-align": "center",
+            }
+        ):
+            # Logo and title
+            solara.HTML(tag="div", unsafe_innerHTML="""
+                <div style="font-size: 48px; margin-bottom: 8px;">🗺️</div>
+                <h1 style="margin: 0 0 8px 0; font-size: 24px; color: #1f2937; font-weight: 600;">
+                    HTYPE Geographic Dashboard
+                </h1>
+                <p style="margin: 0 0 24px 0; color: #6b7280; font-size: 14px;">
+                    NYC Human Trafficking Prevention Education
+                </p>
+            """)
+
+            # Error message
+            if _auth_error.value:
+                rv.Alert(
+                    type="error",
+                    dense=True,
+                    children=[_auth_error.value],
+                    style_="margin-bottom: 16px;",
+                )
+
+            # Password field using ipyvuetify for proper binding
+            rv.TextField(
+                v_model=password_input,
+                on_v_model=set_password_input,
+                label="Password",
+                type="password",
+                outlined=True,
+                style_="margin-bottom: 16px;",
+            )
+
+            # Sign In button - using solara.Button which works reliably
+            solara.Button(
+                label="Sign In",
+                on_click=do_login,
+                color="primary",
+                style={"width": "100%", "height": "44px"},
+            )
+
+            # Footer
+            solara.HTML(tag="p", unsafe_innerHTML="""
+                <p style="margin: 24px 0 0 0; color: #9ca3af; font-size: 12px;">
+                    Access restricted to authorized personnel.
+                </p>
+            """)
+
+
+# ============================================================================
 # MAIN PAGE - Custom Layout
 # ============================================================================
 
@@ -4357,6 +5655,18 @@ def Page():
     │ - Selected school                     │                             │
     └───────────────────────────────────────┴─────────────────────────────┘
     """
+    # ====== AUTHENTICATION CHECK ======
+    # Show loading screen during login transition (after password accepted, before dashboard ready)
+    if DASHBOARD_PASSWORD:
+        if _is_logging_in.value:
+            LoadingScreen()
+            return
+        if not _authenticated.value:
+            LoginPage()
+            return
+
+    # ====== MAIN DASHBOARD (authenticated or no password set) ======
+
     # Reactive state - filters
     mode = solara.use_reactive("All Schools")  # Training status filter: All Schools, Trained, Untrained
     selected_school = solara.use_reactive("")
@@ -4423,6 +5733,14 @@ def Page():
     # Reactive state - UI controls (responsive)
     sidebar_open = solara.use_reactive(True)  # Sidebar visibility toggle
     overflow_open = solara.use_reactive(False)  # Overflow menu open state
+
+    # Auto-open sidebar when a school is selected (critical for mobile UX)
+    def auto_open_sidebar_on_selection():
+        if selected_school.value:
+            sidebar_open.set(True)
+            sidebar_mode.set("school")
+
+    solara.use_effect(auto_open_sidebar_on_selection, dependencies=[selected_school.value])
 
     # Reactive state - map position (for Locate button)
     # NYC 5-borough center: shifted east from Hudson to show Queens/Brooklyn, less NJ
@@ -4728,8 +6046,8 @@ def Page():
     if 'superintendent' in df_raw.columns:
         superintendent_options += sorted(df_raw['superintendent'].dropna().unique().tolist())
 
-    # Main layout
-    with solara.Column(gap="0px", style={"height": "100vh", "overflow": "hidden"}):
+    # Main layout - use flexbox for proper height distribution on mobile
+    with solara.Column(gap="0px", classes=["main-app-container"], style={"height": "100vh", "display": "flex", "flex-direction": "column", "overflow": "hidden"}):
         # Toolbar row (full width)
         Toolbar(
             borough_filter=borough_filter,
@@ -4768,10 +6086,47 @@ def Page():
             on_clear_all=reset_all_filters
         )
 
-        # Content row (sidebar + map)
-        with solara.Row(gap="0px", style={"flex": "1", "overflow": "hidden", "position": "relative"}):
+        # Content row (sidebar + map) - flex: 1 fills remaining space after toolbar
+        with solara.Row(gap="0px", classes=["content-row"], style={"flex": "1", "min-height": "0", "overflow": "hidden", "position": "relative"}):
             # Left sidebar - REDESIGNED with three modes (Overview, Cluster, School)
-            with solara.Column(style={"width": "360px", "flex-shrink": "0", "border-right": "1px solid #e5e7eb"}):
+            # CSS classes control responsive width; inline style only for non-width properties
+            sidebar_classes = ["info-panel-container"]
+            if not sidebar_open.value:
+                sidebar_classes.append("sidebar-closed")
+
+            with solara.Column(
+                classes=sidebar_classes,
+                style={
+                    "flex-shrink": "0",
+                    "border-right": "1px solid #e5e7eb",
+                    "height": "100%",  # Parent row handles height calculation
+                    "overflow": "hidden",
+                    "background": "#ffffff",
+                }
+            ):
+                # Drag handle for bottom sheet (only visible on phones <600px)
+                # Uses Solara Button with native on_click - bypasses JavaScript limitations
+                solara.Button(
+                    label="",  # Empty label, styled via CSS
+                    on_click=lambda: sidebar_open.set(False),
+                    classes=["bottom-sheet-handle"],
+                    style={
+                        "width": "100%",
+                        "min-height": "28px",
+                        "height": "28px",
+                        "background": "transparent",
+                        "box-shadow": "none",
+                        "border": "none",
+                        "border-radius": "16px 16px 0 0",
+                        "display": "flex",
+                        "justify-content": "center",
+                        "align-items": "center",
+                        "cursor": "pointer",
+                        "padding": "0",
+                        "margin": "0",
+                    }
+                )
+
                 SidebarRouter(
                     sidebar_mode=sidebar_mode,
                     stats=stats,
