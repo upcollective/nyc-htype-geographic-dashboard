@@ -2,3 +2,7 @@
 [solara]
 # Serve static assets from the 'assets' directory at /static/assets/
 assets = "assets"
+
+[solara.ssg]
+# Enable static site generation for pre-rendered meta tags
+enabled = true
